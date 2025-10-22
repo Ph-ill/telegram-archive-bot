@@ -30,7 +30,7 @@ COPY requirements-selenium.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
-COPY selenium_archive_bot.py .
+COPY docker_webhook_bot.py .
 
 # Create non-root user for security
 RUN useradd -m -u 1000 botuser
@@ -49,4 +49,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8443/health || exit 1
 
 # Default command
-CMD ["python", "selenium_archive_bot.py"]
+CMD ["python", "docker_webhook_bot.py"]

@@ -4,7 +4,7 @@ services:
   dimibot:
     build:
       context: .
-      dockerfile: Dockerfile.selenium
+      dockerfile: Dockerfile
     container_name: dimibot
     restart: unless-stopped
     ports:
