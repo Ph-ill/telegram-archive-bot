@@ -17,14 +17,29 @@ import threading
 import time
 
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('/app/logs/bot.log') if os.path.exists('/app/logs') else logging.NullHandler()
-    ]
-)
+def setup_logging():
+    """Setup logging with proper error handling"""
+    handlers = [logging.StreamHandler(sys.stdout)]
+    
+    # Try to add file handler if logs directory exists and is writable
+    try:
+        log_dir = '/app/logs'
+        if os.path.exists(log_dir) and os.access(log_dir, os.W_OK):
+            handlers.append(logging.FileHandler(os.path.join(log_dir, 'bot.log')))
+        elif os.path.exists('/app/data') and os.access('/app/data', os.W_OK):
+            # Fallback to data directory
+            handlers.append(logging.FileHandler('/app/data/bot.log'))
+    except Exception as e:
+        print(f"Warning: Could not setup file logging: {e}")
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=handlers
+    )
+
+# Setup logging
+setup_logging()
 logger = logging.getLogger(__name__)
 
 class DockerWebhookArchiveBot:

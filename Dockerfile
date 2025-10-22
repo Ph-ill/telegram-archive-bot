@@ -18,11 +18,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY docker_webhook_bot.py .
 COPY processed_messages.json* ./
 
-# Create directories for persistent data
-RUN mkdir -p /app/data /app/logs
-
 # Create non-root user for security
-RUN useradd -m -u 1000 botuser && chown -R botuser:botuser /app
+RUN useradd -m -u 1000 botuser
+
+# Create directories for persistent data and set ownership
+RUN mkdir -p /app/data /app/logs && \
+    chown -R botuser:botuser /app
+
 USER botuser
 
 # Expose port
