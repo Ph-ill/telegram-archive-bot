@@ -7,6 +7,10 @@ __pycache__/
 env/
 venv/
 .venv/
+bin/
+include/
+lib/
+lib64/
 pip-log.txt
 pip-delete-this-directory.txt
 
@@ -20,9 +24,14 @@ logs/
 # Data
 data/
 processed_messages.json
+known_chat_ids.json
 
 # Docker
 .dockerignore
+
+# Development files
+files_for_github.txt
+mcp_errors*.log
 
 # IDE
 .vscode/

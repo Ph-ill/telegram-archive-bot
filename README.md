@@ -8,12 +8,13 @@ A Telegram bot that automatically archives links using archive.ph when mentioned
 
 ## ✨ Features
 
+- **Creates fresh archives** using Selenium browser automation
 - **Real-time responses** via webhooks
-- **Latest snapshot URLs** using `https://archive.ph/2025/url` format
 - **Works in any chat** - personal, groups, channels
-- **Docker containerized** for easy deployment
+- **Docker containerized** with Chrome and ChromeDriver
 - **Health monitoring** and logging
 - **Persistent data storage**
+- **Clean message format** - just shows archived links
 
 ## 🚀 Quick Start
 
@@ -151,15 +152,12 @@ ngrok http 8443
 telegram-archive-bot/
 ├── Dockerfile                 # Container definition
 ├── docker-compose.yml        # Container orchestration
-├── docker_webhook_bot.py     # Main bot application
+├── docker_webhook_bot.py     # Main bot application (Selenium-powered)
 ├── requirements-docker.txt   # Python dependencies
+├── nginx.conf                # Nginx reverse proxy configuration
 ├── .env.example              # Environment template
 ├── .gitignore               # Git ignore rules
-├── README.md                # This file
-└── docs/                    # Documentation
-    ├── portainer-deployment.md
-    ├── github-portainer-setup.md
-    └── nginx.conf
+└── README.md                # This file
 ```
 
 ## 🔄 Updates
