@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y \
 RUN rm -f /usr/local/bin/chromedriver
 
 # Copy requirements first for better caching
-COPY requirements-selenium.txt requirements.txt
+COPY requirements-docker.txt requirements.txt
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
