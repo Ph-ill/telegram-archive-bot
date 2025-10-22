@@ -128,6 +128,9 @@ class SeleniumArchiveBot:
     def create_driver(self):
         """Create a headless Chrome driver"""
         try:
+            from selenium.webdriver.chrome.service import Service
+            from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+            
             chrome_options = Options()
             chrome_options.add_argument("--headless")
             chrome_options.add_argument("--no-sandbox")
@@ -135,7 +138,9 @@ class SeleniumArchiveBot:
             chrome_options.add_argument("--disable-gpu")
             chrome_options.add_argument("--window-size=1920,1080")
             chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+            chrome_options.add_argument("--remote-debugging-port=9222")
             
+            # Let Selenium automatically manage ChromeDriver
             driver = webdriver.Chrome(options=chrome_options)
             driver.set_page_load_timeout(30)
             return driver
