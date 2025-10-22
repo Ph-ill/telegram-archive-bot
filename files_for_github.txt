@@ -1,0 +1,12 @@
+Dockerfile
+docker_webhook_bot.py
+requirements-docker.txt
+docker-compose.yml
+.env.example
+.gitignore
+README.md
+portainer-deployment.md
+github-portainer-setup.md
+portainer-quick-start.md
+portainer-stack.yml
+nginx.conf
