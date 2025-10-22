@@ -250,14 +250,18 @@ class SeleniumArchiveBot:
             logger.info(f"Starting archive process for: {url}")
             archived_url = self.archive_url_with_selenium(url)
             if archived_url:
-                archived_results.append(f"📁 {url}\n   → {archived_url}")
+                archived_results.append(f"📁 {archived_url}")
             else:
                 # Fallback to year-based URL if Selenium fails
                 current_year = datetime.now().year
                 fallback_url = f"https://archive.ph/{current_year}/{url}"
-                archived_results.append(f"⚠️ {url}\n   → {fallback_url} (fallback - may not exist)")
+                archived_results.append(f"⚠️ {fallback_url} (fallback - may not exist)")
         
-        return f"@{sender_name} Here are your archived links:\n\n" + "\n\n".join(archived_results)
+        # Use singular/plural based on number of URLs
+        if len(urls) == 1:
+            return f"@{sender_name} Here is your archived link:\n\n" + "\n\n".join(archived_results)
+        else:
+            return f"@{sender_name} Here are your archived links:\n\n" + "\n\n".join(archived_results)
     
     def send_message(self, chat_id, text, reply_to_message_id=None):
         """Send message via Telegram Bot API"""
