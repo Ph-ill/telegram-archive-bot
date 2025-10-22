@@ -12,8 +12,8 @@ services:
       - WEBHOOK_URL=${WEBHOOK_URL:-https://dimibot.coolphill.com/webhook}
       - PORT=8443
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
+      - dimibot_data:/app/data
+      - dimibot_logs:/app/logs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8443/health"]
       interval: 30s
@@ -25,9 +25,15 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.dimibot.rule=Host(`dimibot.coolphill.com`)"
-      - "traefik.http.routers.dimibot.tls=true"
-      - "traefik.http.routers.dimibot.tls.certresolver=letsencrypt"
-      - "traefik.http.services.dimibot.loadbalancer.server.port=8443"
+    networks:
+      - Shared
+
+volumes:
+  dimibot_data:
+    driver: local
+  dimibot_logs:
+    driver: local
+
+networks:
+  Shared:
+    external: true
