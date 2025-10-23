@@ -568,8 +568,12 @@ class SeleniumArchiveBot:
         if not self.is_bot_mentioned(text):
             return None
         
-        # Check for help commands first
-        if any(cmd in text.lower() for cmd in ["help", "list", "/"]) and len(text.strip()) < 50:
+        # Check for help commands first (but not list_birthdays)
+        help_keywords = ["help", "/"]
+        if "list_birthdays" not in text.lower() and any(cmd in text.lower() for cmd in help_keywords) and len(text.strip()) < 50:
+            return self.get_help_message(sender_name, sender_username)
+        # Also check for standalone "list" command (not part of list_birthdays)
+        if " list " in f" {text.lower()} " and "list_birthdays" not in text.lower() and len(text.strip()) < 50:
             return self.get_help_message(sender_name, sender_username)
         
         # Check for birthday commands
