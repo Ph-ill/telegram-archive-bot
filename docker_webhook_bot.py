@@ -342,11 +342,22 @@ class SeleniumArchiveBot:
             if not birthdays:
                 return f"@{sender_name} No birthdays stored in the database."
             
-            # Format birthday list
+            # Sort birthdays chronologically (by month and day)
+            def get_birthday_sort_key(item):
+                username, data = item
+                birth_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+                # Use month and day for chronological sorting (ignore year)
+                return (birth_date.month, birth_date.day)
+            
+            sorted_birthdays = sorted(birthdays.items(), key=get_birthday_sort_key)
+            
+            # Format birthday list (without @ to avoid pinging users)
             birthday_list = []
-            for username, data in sorted(birthdays.items()):
+            for username, data in sorted_birthdays:
                 age = self.calculate_age(data['date'])
-                birthday_list.append(f"@{username}: {data['date']} ({data['timezone']}) - Age: {age}")
+                birth_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+                formatted_date = birth_date.strftime('%B %d, %Y')  # e.g., "March 15, 1990"
+                birthday_list.append(f"{username}: {formatted_date} ({data['timezone']}) - Age: {age}")
             
             total_count = len(birthdays)
             header = f"@{sender_name} 📋 Birthday Database ({total_count} users):\n\n"
