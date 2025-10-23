@@ -563,7 +563,7 @@ class SeleniumArchiveBot:
                 except:
                     pass
     
-    def process_message_for_archives(self, text, sender_name="User", sender_id=None, chat_id=None):
+    def process_message_for_archives(self, text, sender_name="User", sender_username=None, sender_id=None, chat_id=None):
         """Process message for archive requests and other commands"""
         if not self.is_bot_mentioned(text):
             return None
@@ -659,7 +659,7 @@ class SeleniumArchiveBot:
                 return
             
             # Process if bot is mentioned
-            reply_text = self.process_message_for_archives(text, sender_name, sender_username, chat_id)
+            reply_text = self.process_message_for_archives(text, sender_name, sender_username, sender_id, chat_id)
             if reply_text:
                 # Mark as processed
                 self.processed_messages.add(msg_key)
