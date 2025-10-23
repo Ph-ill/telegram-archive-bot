@@ -330,6 +330,29 @@ class SeleniumArchiveBot:
             
             return f"@{sender_name} ✅ Birthday deleted for @{username_to_delete}!\nDeleted data:\nBirthday: {existing['date']}\nTimezone: {existing['timezone']}\nAge: {existing_age}"
         
+        elif "list_birthdays" in text.lower():
+            # Only special users can list all birthdays
+            special_users = ["RacistWaluigi", "kokorozasu"]
+            if sender_username not in special_users:
+                return f"@{sender_name} Only @RacistWaluigi and @kokorozasu can list all birthdays."
+            
+            # Load existing birthdays
+            birthdays = self.load_birthdays()
+            
+            if not birthdays:
+                return f"@{sender_name} No birthdays stored in the database."
+            
+            # Format birthday list
+            birthday_list = []
+            for username, data in sorted(birthdays.items()):
+                age = self.calculate_age(data['date'])
+                birthday_list.append(f"@{username}: {data['date']} ({data['timezone']}) - Age: {age}")
+            
+            total_count = len(birthdays)
+            header = f"@{sender_name} 📋 Birthday Database ({total_count} users):\n\n"
+            
+            return header + "\n".join(birthday_list)
+        
         elif "test_birthday" in text.lower():
             # Send test birthday message to current chat
             return self.send_test_birthday_message(chat_id)
@@ -487,7 +510,7 @@ class SeleniumArchiveBot:
             return None
         
         # Check for birthday commands first
-        if "birthday" in text.lower() or "test_birthday" in text.lower() or "delete_birthday" in text.lower():
+        if "birthday" in text.lower() or "test_birthday" in text.lower() or "delete_birthday" in text.lower() or "list_birthdays" in text.lower():
             return self.process_birthday_command(text, sender_name, sender_id, chat_id)
         
         # Check if message contains the word "archive" (case insensitive)
