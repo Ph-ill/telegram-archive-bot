@@ -154,13 +154,13 @@ class SeleniumArchiveBot:
     
     def is_user_authorized(self, sender_username, target_username):
         """Check if user is authorized to set birthday for target username"""
-        # Special users can modify any birthday
-        special_users = ["RacistWaluigi", "kokorozasu"]
-        if sender_username in special_users:
+        # Special users can modify any birthday (case insensitive)
+        special_users = ["racistwaluigi", "kokorozasu"]
+        if sender_username.lower() in special_users:
             return True, "admin"
         
-        # Any user can set their own birthday
-        if sender_username == target_username:
+        # Any user can set their own birthday (case insensitive)
+        if sender_username.lower() == target_username.lower():
             return True, "self"
         
         return False, "unauthorized"
@@ -302,8 +302,8 @@ class SeleniumArchiveBot:
         
         elif "delete_birthday" in text.lower():
             # Only special users can delete birthdays
-            special_users = ["RacistWaluigi", "kokorozasu"]
-            if sender_username not in special_users:
+            special_users = ["racistwaluigi", "kokorozasu"]
+            if sender_username.lower() not in special_users:
                 return f"@{sender_name} Only @RacistWaluigi and @kokorozasu can delete birthdays."
             
             # Parse delete command
@@ -332,8 +332,8 @@ class SeleniumArchiveBot:
         
         elif "list_birthdays" in text.lower():
             # Only special users can list all birthdays
-            special_users = ["RacistWaluigi", "kokorozasu"]
-            if sender_username not in special_users:
+            special_users = ["racistwaluigi", "kokorozasu"]
+            if sender_username.lower() not in special_users:
                 return f"@{sender_name} Only @RacistWaluigi and @kokorozasu can list all birthdays."
             
             # Load existing birthdays
