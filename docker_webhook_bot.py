@@ -152,31 +152,18 @@ class SeleniumArchiveBot:
         except Exception as e:
             logger.error(f"Error saving birthdays: {e}")
     
-    def is_user_authorized(self, user_id, chat_id):
-        """Check if user is authorized to manage birthdays"""
-        # Always allow @RacistWaluigi
-        if user_id == "RacistWaluigi":
-            return True
+    def is_user_authorized(self, sender_username, target_username):
+        """Check if user is authorized to set birthday for target username"""
+        # Special users can modify any birthday
+        special_users = ["RacistWaluigi", "kokorozasu"]
+        if sender_username in special_users:
+            return True, "admin"
         
-        # Check if user is admin in the group chat
-        try:
-            import requests
-            url = f"{self.telegram_api_url}/getChatMember"
-            data = {
-                'chat_id': chat_id,
-                'user_id': user_id
-            }
-            response = requests.post(url, json=data, timeout=10)
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('ok'):
-                    member = result.get('result', {})
-                    status = member.get('status', '')
-                    return status in ['administrator', 'creator']
-        except Exception as e:
-            logger.error(f"Error checking admin status: {e}")
+        # Any user can set their own birthday
+        if sender_username == target_username:
+            return True, "self"
         
-        return False
+        return False, "unauthorized"
     
     def parse_birthday_command(self, text):
         """Parse birthday set command"""
@@ -266,34 +253,40 @@ class SeleniumArchiveBot:
             logger.error(f"Error sending birthday message: {e}")
             return False
     
-    def process_birthday_command(self, text, sender_name, sender_id, chat_id):
+    def process_birthday_command(self, text, sender_name, sender_username, chat_id):
         """Process birthday-related commands"""
         if "birthday set" in text.lower():
-            # Check authorization
-            if not self.is_user_authorized(sender_id, chat_id):
-                return f"@{sender_name} You don't have permission to set birthdays. Only group admins and @RacistWaluigi can use this command."
-            
-            # Parse command
+            # Parse command first
             birthday_data, error = self.parse_birthday_command(text)
             if error:
                 return f"@{sender_name} {error}"
             
+            target_username = birthday_data['username']
+            
+            # Check authorization
+            is_authorized, auth_type = self.is_user_authorized(sender_username, target_username)
+            if not is_authorized:
+                return f"@{sender_name} You can only set your own birthday. To set birthday for @{target_username}, ask @RacistWaluigi or @kokorozasu to do it."
+            
             # Load existing birthdays
             birthdays = self.load_birthdays()
-            username = birthday_data['username']
             
             # Check if user already exists
-            if username in birthdays:
-                existing = birthdays[username]
+            if target_username in birthdays:
+                existing = birthdays[target_username]
                 existing_age = self.calculate_age(existing['date'])
-                return f"@{sender_name} User @{username} already exists:\nBirthday: {existing['date']}\nTimezone: {existing['timezone']}\nCurrent age: {existing_age}\n\nReply with 'y' to replace this information."
+                return f"@{sender_name} User @{target_username} already exists:\nBirthday: {existing['date']}\nTimezone: {existing['timezone']}\nCurrent age: {existing_age}\n\nReply with 'y' to replace this information."
             
             # Save new birthday
-            birthdays[username] = birthday_data
+            birthdays[target_username] = birthday_data
             self.save_birthdays(birthdays)
             
             age = self.calculate_age(birthday_data['date'])
-            return f"@{sender_name} ✅ Birthday saved for @{username}!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}"
+            
+            if auth_type == "self":
+                return f"@{sender_name} ✅ Your birthday has been saved!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}"
+            else:
+                return f"@{sender_name} ✅ Birthday saved for @{target_username}!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}"
         
         elif "test_birthday" in text.lower():
             # Send test birthday message to current chat
