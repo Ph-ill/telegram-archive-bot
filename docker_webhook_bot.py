@@ -378,6 +378,46 @@ class SeleniumArchiveBot:
         
         return None
     
+    def get_help_message(self, sender_name, sender_username):
+        """Generate help message with available commands"""
+        special_users = ["racistwaluigi", "kokorozasu"]
+        is_special_user = sender_username.lower() in special_users
+        
+        help_text = f"@{sender_name} 🤖 **Angel Dimi Bot Commands:**\n\n"
+        
+        # Archive commands (available to everyone)
+        help_text += "📁 **Archive Commands:**\n"
+        help_text += "• `@Angel_Dimi_Bot archive <URL>` - Archive a link\n"
+        help_text += "  Example: `@Angel_Dimi_Bot archive https://example.com`\n\n"
+        
+        # Birthday commands (available to everyone for self)
+        help_text += "🎂 **Birthday Commands:**\n"
+        help_text += "• `@Angel_Dimi_Bot birthday set YYYY-MM-DD Timezone [username]`\n"
+        help_text += "  Set birthday (omit username to set your own)\n"
+        help_text += "  Example: `@Angel_Dimi_Bot birthday set 1990-03-15 America/New_York`\n"
+        help_text += "• `@Angel_Dimi_Bot test_birthday` - Send test birthday message\n\n"
+        
+        # Special user commands
+        if is_special_user:
+            help_text += "👑 **Admin Commands** (Special Users Only):\n"
+            help_text += "• `@Angel_Dimi_Bot delete_birthday @username` - Delete a birthday\n"
+            help_text += "• `@Angel_Dimi_Bot list_birthdays` - List all stored birthdays\n"
+            help_text += "• Can set birthdays for any user\n\n"
+        
+        # Help commands
+        help_text += "ℹ️ **Help Commands:**\n"
+        help_text += "• `@Angel_Dimi_Bot help` - Show this help message\n"
+        help_text += "• `@Angel_Dimi_Bot list` - Show available commands\n"
+        help_text += "• `@Angel_Dimi_Bot /` - Show command summary\n\n"
+        
+        # Additional info
+        help_text += "📝 **Notes:**\n"
+        help_text += "• Works in groups and private messages\n"
+        help_text += "• Birthday alerts sent to group at midnight in your timezone\n"
+        help_text += "• Timezone list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
+        
+        return help_text
+    
     def send_test_birthday_message(self, chat_id):
         """Send test birthday message for @RacistWaluigi"""
         try:
@@ -528,7 +568,11 @@ class SeleniumArchiveBot:
         if not self.is_bot_mentioned(text):
             return None
         
-        # Check for birthday commands first
+        # Check for help commands first
+        if any(cmd in text.lower() for cmd in ["help", "list", "/"]) and len(text.strip()) < 50:
+            return self.get_help_message(sender_name, sender_username)
+        
+        # Check for birthday commands
         if "birthday" in text.lower() or "test_birthday" in text.lower() or "delete_birthday" in text.lower() or "list_birthdays" in text.lower():
             return self.process_birthday_command(text, sender_name, sender_username, sender_id, chat_id)
         
