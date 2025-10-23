@@ -165,16 +165,24 @@ class SeleniumArchiveBot:
         
         return False, "unauthorized"
     
-    def parse_birthday_command(self, text):
+    def parse_birthday_command(self, text, sender_username=None, sender_id=None):
         """Parse birthday set command"""
-        # Expected format: @Angel_Dimi_Bot birthday set 1990-03-15 America/New_York myusername
-        pattern = r'birthday\s+set\s+(\d{4}-\d{2}-\d{2})\s+([^\s]+)\s+@?(\w+)'
-        match = re.search(pattern, text, re.IGNORECASE)
+        # Try format with username: @Angel_Dimi_Bot birthday set 1990-03-15 America/New_York myusername
+        pattern_with_username = r'birthday\s+set\s+(\d{4}-\d{2}-\d{2})\s+([^\s]+)\s+@?(\w+)'
+        match_with_username = re.search(pattern_with_username, text, re.IGNORECASE)
         
-        if not match:
-            return None, "Invalid format. Use: `@Angel_Dimi_Bot birthday set YYYY-MM-DD Timezone username`\nExample: `@Angel_Dimi_Bot birthday set 1990-03-15 America/New_York myusername`"
+        # Try format without username: @Angel_Dimi_Bot birthday set 1990-03-15 America/New_York
+        pattern_without_username = r'birthday\s+set\s+(\d{4}-\d{2}-\d{2})\s+([^\s]+)(?:\s|$)'
+        match_without_username = re.search(pattern_without_username, text, re.IGNORECASE)
         
-        date_str, timezone_str, username = match.groups()
+        if match_with_username:
+            date_str, timezone_str, username = match_with_username.groups()
+        elif match_without_username:
+            date_str, timezone_str = match_without_username.groups()
+            # Use sender's username or ID as fallback
+            username = sender_username or f"user_{sender_id}"
+        else:
+            return None, "Invalid format. Use:\n`@Angel_Dimi_Bot birthday set YYYY-MM-DD Timezone [username]`\n\nExamples:\n• `@Angel_Dimi_Bot birthday set 1990-03-15 America/New_York` (uses your username/ID)\n• `@Angel_Dimi_Bot birthday set 1990-03-15 America/New_York john` (sets for specific user)"
         
         # Validate date format
         try:
@@ -265,11 +273,11 @@ class SeleniumArchiveBot:
             logger.error(f"Error sending birthday message: {e}")
             return False
     
-    def process_birthday_command(self, text, sender_name, sender_username, chat_id):
+    def process_birthday_command(self, text, sender_name, sender_username, sender_id, chat_id):
         """Process birthday-related commands"""
         if "birthday set" in text.lower():
             # Parse command first
-            birthday_data, error = self.parse_birthday_command(text)
+            birthday_data, error = self.parse_birthday_command(text, sender_username, sender_id)
             if error:
                 return f"@{sender_name} {error}"
             
@@ -522,7 +530,7 @@ class SeleniumArchiveBot:
         
         # Check for birthday commands first
         if "birthday" in text.lower() or "test_birthday" in text.lower() or "delete_birthday" in text.lower() or "list_birthdays" in text.lower():
-            return self.process_birthday_command(text, sender_name, sender_id, chat_id)
+            return self.process_birthday_command(text, sender_name, sender_username, sender_id, chat_id)
         
         # Check if message contains the word "archive" (case insensitive)
         if "archive" not in text.lower():
@@ -593,7 +601,10 @@ class SeleniumArchiveBot:
             sender = message.get('from', {})
             sender_name = sender.get('first_name', 'User')
             sender_id = sender.get('id')
-            sender_username = sender.get('username', str(sender_id))
+            sender_username = sender.get('username')
+            # If no username, use user_ID format for identification
+            if not sender_username:
+                sender_username = f"user_{sender_id}"
             
             # Create unique message identifier
             msg_key = f"{chat_id}_{message_id}"
