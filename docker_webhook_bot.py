@@ -10,9 +10,13 @@ import os
 import signal
 import sys
 import time
-from datetime import datetime
+import random
+import glob
+from datetime import datetime, date
 from flask import Flask, request, jsonify
 import threading
+import pytz
+from dateutil.relativedelta import relativedelta
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -125,6 +129,214 @@ class SeleniumArchiveBot:
             return False
         return f"@{self.bot_username.lower()}" in text.lower()
     
+    # Birthday functionality
+    def load_birthdays(self):
+        """Load birthday data from JSON file"""
+        birthday_file = os.path.join(self.data_dir, "birthdays.json")
+        try:
+            with open(birthday_file, 'r') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return {}
+        except Exception as e:
+            logger.error(f"Error loading birthdays: {e}")
+            return {}
+    
+    def save_birthdays(self, birthdays):
+        """Save birthday data to JSON file"""
+        birthday_file = os.path.join(self.data_dir, "birthdays.json")
+        try:
+            os.makedirs(os.path.dirname(birthday_file), exist_ok=True)
+            with open(birthday_file, 'w') as f:
+                json.dump(birthdays, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving birthdays: {e}")
+    
+    def is_user_authorized(self, user_id, chat_id):
+        """Check if user is authorized to manage birthdays"""
+        # Always allow @RacistWaluigi
+        if user_id == "RacistWaluigi":
+            return True
+        
+        # Check if user is admin in the group chat
+        try:
+            import requests
+            url = f"{self.telegram_api_url}/getChatMember"
+            data = {
+                'chat_id': chat_id,
+                'user_id': user_id
+            }
+            response = requests.post(url, json=data, timeout=10)
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('ok'):
+                    member = result.get('result', {})
+                    status = member.get('status', '')
+                    return status in ['administrator', 'creator']
+        except Exception as e:
+            logger.error(f"Error checking admin status: {e}")
+        
+        return False
+    
+    def parse_birthday_command(self, text):
+        """Parse birthday set command"""
+        # Expected format: @Angel_Dimi_Bot birthday set 1990-03-15 America/New_York myusername
+        pattern = r'birthday\s+set\s+(\d{4}-\d{2}-\d{2})\s+([^\s]+)\s+@?(\w+)'
+        match = re.search(pattern, text, re.IGNORECASE)
+        
+        if not match:
+            return None, "Invalid format. Use: `@Angel_Dimi_Bot birthday set YYYY-MM-DD Timezone username`\nExample: `@Angel_Dimi_Bot birthday set 1990-03-15 America/New_York myusername`"
+        
+        date_str, timezone_str, username = match.groups()
+        
+        # Validate date format
+        try:
+            birth_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return None, "Invalid date format. Use YYYY-MM-DD format.\nExample: 1990-03-15"
+        
+        # Validate timezone
+        try:
+            pytz.timezone(timezone_str)
+        except pytz.exceptions.UnknownTimeZoneError:
+            return None, f"Invalid timezone '{timezone_str}'. See valid timezones at: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
+        
+        return {
+            'date': date_str,
+            'timezone': timezone_str,
+            'username': username
+        }, None
+    
+    def calculate_age(self, birth_date_str):
+        """Calculate current age from birth date"""
+        birth_date = datetime.strptime(birth_date_str, '%Y-%m-%d').date()
+        today = date.today()
+        age = today.year - birth_date.year
+        if today < birth_date.replace(year=today.year):
+            age -= 1
+        return age
+    
+    def get_random_birthday_image(self):
+        """Get a random birthday image from the birthday_images folder"""
+        try:
+            image_folder = os.path.join(os.path.dirname(__file__), 'birthday_images')
+            if not os.path.exists(image_folder):
+                logger.warning("birthday_images folder not found")
+                return None
+            
+            # Get all gif files
+            gif_files = glob.glob(os.path.join(image_folder, '*.gif'))
+            if not gif_files:
+                logger.warning("No gif files found in birthday_images folder")
+                return None
+            
+            return random.choice(gif_files)
+        except Exception as e:
+            logger.error(f"Error getting birthday image: {e}")
+            return None
+    
+    def send_birthday_message(self, username, age, chat_id=-1002220894500):
+        """Send birthday message to group chat"""
+        try:
+            message = f"🎈 It's @{username}'s birthday today! They're turning {age}! 🎉 Celebrate! 🎂"
+            
+            # Get random birthday image
+            image_path = self.get_random_birthday_image()
+            
+            if image_path:
+                # Send with image
+                import requests
+                url = f"{self.telegram_api_url}/sendAnimation"
+                
+                with open(image_path, 'rb') as gif_file:
+                    files = {'animation': gif_file}
+                    data = {
+                        'chat_id': chat_id,
+                        'caption': message
+                    }
+                    response = requests.post(url, files=files, data=data, timeout=30)
+            else:
+                # Send text only
+                self.send_message(chat_id, message)
+            
+            logger.info(f"Birthday message sent for {username}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error sending birthday message: {e}")
+            return False
+    
+    def process_birthday_command(self, text, sender_name, sender_id, chat_id):
+        """Process birthday-related commands"""
+        if "birthday set" in text.lower():
+            # Check authorization
+            if not self.is_user_authorized(sender_id, chat_id):
+                return f"@{sender_name} You don't have permission to set birthdays. Only group admins and @RacistWaluigi can use this command."
+            
+            # Parse command
+            birthday_data, error = self.parse_birthday_command(text)
+            if error:
+                return f"@{sender_name} {error}"
+            
+            # Load existing birthdays
+            birthdays = self.load_birthdays()
+            username = birthday_data['username']
+            
+            # Check if user already exists
+            if username in birthdays:
+                existing = birthdays[username]
+                existing_age = self.calculate_age(existing['date'])
+                return f"@{sender_name} User @{username} already exists:\nBirthday: {existing['date']}\nTimezone: {existing['timezone']}\nCurrent age: {existing_age}\n\nReply with 'y' to replace this information."
+            
+            # Save new birthday
+            birthdays[username] = birthday_data
+            self.save_birthdays(birthdays)
+            
+            age = self.calculate_age(birthday_data['date'])
+            return f"@{sender_name} ✅ Birthday saved for @{username}!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}"
+        
+        elif "test_birthday" in text.lower():
+            # Send test birthday message to current chat
+            return self.send_test_birthday_message(chat_id)
+        
+        return None
+    
+    def send_test_birthday_message(self, chat_id):
+        """Send test birthday message for @RacistWaluigi"""
+        try:
+            age = 25  # Test age
+            message = f"🎈 It's @RacistWaluigi's birthday today! They're turning {age}! 🎉 Celebrate! 🎂"
+            
+            # Get random birthday image
+            image_path = self.get_random_birthday_image()
+            
+            if image_path:
+                # Send with image
+                import requests
+                url = f"{self.telegram_api_url}/sendAnimation"
+                
+                with open(image_path, 'rb') as gif_file:
+                    files = {'animation': gif_file}
+                    data = {
+                        'chat_id': chat_id,
+                        'caption': f"🧪 TEST BIRTHDAY MESSAGE:\n\n{message}"
+                    }
+                    response = requests.post(url, files=files, data=data, timeout=30)
+                    
+                    if response.status_code == 200:
+                        return "✅ Test birthday message sent!"
+                    else:
+                        return f"❌ Failed to send test message: {response.text}"
+            else:
+                # Send text only
+                test_message = f"🧪 TEST BIRTHDAY MESSAGE:\n\n{message}"
+                success = self.send_message(chat_id, test_message)
+                return "✅ Test birthday message sent!" if success else "❌ Failed to send test message"
+                
+        except Exception as e:
+            logger.error(f"Error sending test birthday message: {e}")
+            return f"❌ Error sending test message: {str(e)}"
+    
     def create_driver(self):
         """Create a headless Chrome driver"""
         try:
@@ -234,10 +446,14 @@ class SeleniumArchiveBot:
                 except:
                     pass
     
-    def process_message_for_archives(self, text, sender_name="User"):
-        """Process message and return archive reply"""
+    def process_message_for_archives(self, text, sender_name="User", sender_id=None, chat_id=None):
+        """Process message for archive requests and other commands"""
         if not self.is_bot_mentioned(text):
             return None
+        
+        # Check for birthday commands first
+        if "birthday" in text.lower() or "test_birthday" in text.lower():
+            return self.process_birthday_command(text, sender_name, sender_id, chat_id)
         
         # Check if message contains the word "archive" (case insensitive)
         if "archive" not in text.lower():
@@ -307,6 +523,8 @@ class SeleniumArchiveBot:
             text = message.get('text', '')
             sender = message.get('from', {})
             sender_name = sender.get('first_name', 'User')
+            sender_id = sender.get('id')
+            sender_username = sender.get('username', str(sender_id))
             
             # Create unique message identifier
             msg_key = f"{chat_id}_{message_id}"
@@ -317,7 +535,7 @@ class SeleniumArchiveBot:
                 return
             
             # Process if bot is mentioned
-            reply_text = self.process_message_for_archives(text, sender_name)
+            reply_text = self.process_message_for_archives(text, sender_name, sender_username, chat_id)
             if reply_text:
                 # Mark as processed
                 self.processed_messages.add(msg_key)

@@ -27,6 +27,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY docker_webhook_bot.py .
+COPY birthday_images/ ./birthday_images/
 
 # Create non-root user for security
 RUN useradd -m -u 1000 botuser
