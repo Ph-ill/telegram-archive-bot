@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "telegram-mcp": {
+      "command": "python3",
+      "args": ["/home/phill/telegram-mcp/main.py"],
+      "env": {
+        "BOT_TOKEN": "8144911230:AAGdM9A_QH2hBKJADO8VQ2WRUuyKfWvLgn8"
+      },
+      "disabled": true,
+      "autoApprove": []
+    }
+  }
+}
