@@ -182,7 +182,7 @@ class SeleniumArchiveBot:
             # Use sender's username or ID as fallback
             username = sender_username or f"user_{sender_id}"
         else:
-            return None, "Invalid format. Use:\n`@Angel_Dimi_Bot birthday set YYYY-MM-DD Timezone [username]`\n\nExamples:\n• `@Angel_Dimi_Bot birthday set 1990-03-15 America/New_York` (uses your username/ID)\n• `@Angel_Dimi_Bot birthday set 1990-03-15 America/New_York john` (sets for specific user)"
+            return None, "Invalid format. Use:\n@Angel_Dimi_Bot birthday set YYYY-MM-DD Timezone [username]\n\nExamples:\n• @Angel_Dimi_Bot birthday set 1990-03-15 America/New_York (uses your username/ID)\n• @Angel_Dimi_Bot birthday set 1990-03-15 America/New_York john (sets for specific user)"
         
         # Validate date format
         try:
@@ -317,7 +317,7 @@ class SeleniumArchiveBot:
             # Parse delete command
             delete_result = self.parse_delete_birthday_command(text)
             if delete_result is None:
-                return f"@{sender_name} Invalid format. Use: `@Angel_Dimi_Bot delete_birthday @username`\nExample: `@Angel_Dimi_Bot delete_birthday @john`"
+                return f"@{sender_name} Invalid format. Use: @Angel_Dimi_Bot delete_birthday @username\nExample: @Angel_Dimi_Bot delete_birthday @john"
             
             username_to_delete = delete_result
             
@@ -383,35 +383,35 @@ class SeleniumArchiveBot:
         special_users = ["racistwaluigi", "kokorozasu"]
         is_special_user = sender_username.lower() in special_users
         
-        help_text = f"@{sender_name} 🤖 **Angel Dimi Bot Commands:**\n\n"
+        help_text = f"@{sender_name} 🤖 Angel Dimi Bot Commands:\n\n"
         
         # Archive commands (available to everyone)
-        help_text += "📁 **Archive Commands:**\n"
-        help_text += "• `@Angel_Dimi_Bot archive <URL>` - Archive a link\n"
-        help_text += "  Example: `@Angel_Dimi_Bot archive https://example.com`\n\n"
+        help_text += "📁 Archive Commands:\n"
+        help_text += "• @Angel_Dimi_Bot archive URL - Archive a link\n"
+        help_text += "  Example: @Angel_Dimi_Bot archive https://example.com\n\n"
         
         # Birthday commands (available to everyone for self)
-        help_text += "🎂 **Birthday Commands:**\n"
-        help_text += "• `@Angel_Dimi_Bot birthday set YYYY-MM-DD Timezone [username]`\n"
+        help_text += "🎂 Birthday Commands:\n"
+        help_text += "• @Angel_Dimi_Bot birthday set YYYY-MM-DD Timezone [username]\n"
         help_text += "  Set birthday (omit username to set your own)\n"
-        help_text += "  Example: `@Angel_Dimi_Bot birthday set 1990-03-15 America/New_York`\n"
-        help_text += "• `@Angel_Dimi_Bot test_birthday` - Send test birthday message\n\n"
+        help_text += "  Example: @Angel_Dimi_Bot birthday set 1990-03-15 America/New_York\n"
+        help_text += "• @Angel_Dimi_Bot test_birthday - Send test birthday message\n\n"
         
         # Special user commands
         if is_special_user:
-            help_text += "👑 **Admin Commands** (Special Users Only):\n"
-            help_text += "• `@Angel_Dimi_Bot delete_birthday @username` - Delete a birthday\n"
-            help_text += "• `@Angel_Dimi_Bot list_birthdays` - List all stored birthdays\n"
+            help_text += "👑 Admin Commands (Special Users Only):\n"
+            help_text += "• @Angel_Dimi_Bot delete_birthday @username - Delete a birthday\n"
+            help_text += "• @Angel_Dimi_Bot list_birthdays - List all stored birthdays\n"
             help_text += "• Can set birthdays for any user\n\n"
         
         # Help commands
-        help_text += "ℹ️ **Help Commands:**\n"
-        help_text += "• `@Angel_Dimi_Bot help` - Show this help message\n"
-        help_text += "• `@Angel_Dimi_Bot list` - Show available commands\n"
-        help_text += "• `@Angel_Dimi_Bot /` - Show command summary\n\n"
+        help_text += "ℹ️ Help Commands:\n"
+        help_text += "• @Angel_Dimi_Bot help - Show this help message\n"
+        help_text += "• @Angel_Dimi_Bot list - Show available commands\n"
+        help_text += "• @Angel_Dimi_Bot / - Show command summary\n\n"
         
         # Additional info
-        help_text += "📝 **Notes:**\n"
+        help_text += "📝 Notes:\n"
         help_text += "• Works in groups and private messages\n"
         help_text += "• Birthday alerts sent to group at midnight in your timezone\n"
         help_text += "• Timezone list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
@@ -611,8 +611,7 @@ class SeleniumArchiveBot:
             url = f"{self.telegram_api_url}/sendMessage"
             data = {
                 'chat_id': chat_id,
-                'text': text,
-                'parse_mode': 'Markdown'
+                'text': text
             }
             
             if reply_to_message_id:
