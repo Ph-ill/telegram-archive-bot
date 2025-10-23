@@ -194,6 +194,18 @@ class SeleniumArchiveBot:
             'username': username
         }, None
     
+    def parse_delete_birthday_command(self, text):
+        """Parse delete birthday command"""
+        # Expected format: @Angel_Dimi_Bot delete_birthday @username
+        pattern = r'delete_birthday\s+@?(\w+)'
+        match = re.search(pattern, text, re.IGNORECASE)
+        
+        if not match:
+            return None
+        
+        username = match.group(1)
+        return username
+    
     def calculate_age(self, birth_date_str):
         """Calculate current age from birth date"""
         birth_date = datetime.strptime(birth_date_str, '%Y-%m-%d').date()
@@ -287,6 +299,36 @@ class SeleniumArchiveBot:
                 return f"@{sender_name} ✅ Your birthday has been saved!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}"
             else:
                 return f"@{sender_name} ✅ Birthday saved for @{target_username}!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}"
+        
+        elif "delete_birthday" in text.lower():
+            # Only special users can delete birthdays
+            special_users = ["RacistWaluigi", "kokorozasu"]
+            if sender_username not in special_users:
+                return f"@{sender_name} Only @RacistWaluigi and @kokorozasu can delete birthdays."
+            
+            # Parse delete command
+            delete_result = self.parse_delete_birthday_command(text)
+            if delete_result is None:
+                return f"@{sender_name} Invalid format. Use: `@Angel_Dimi_Bot delete_birthday @username`\nExample: `@Angel_Dimi_Bot delete_birthday @john`"
+            
+            username_to_delete = delete_result
+            
+            # Load existing birthdays
+            birthdays = self.load_birthdays()
+            
+            # Check if user exists
+            if username_to_delete not in birthdays:
+                return f"@{sender_name} User @{username_to_delete} not found in birthday database."
+            
+            # Show existing data before deletion
+            existing = birthdays[username_to_delete]
+            existing_age = self.calculate_age(existing['date'])
+            
+            # Delete the birthday
+            del birthdays[username_to_delete]
+            self.save_birthdays(birthdays)
+            
+            return f"@{sender_name} ✅ Birthday deleted for @{username_to_delete}!\nDeleted data:\nBirthday: {existing['date']}\nTimezone: {existing['timezone']}\nAge: {existing_age}"
         
         elif "test_birthday" in text.lower():
             # Send test birthday message to current chat
@@ -445,7 +487,7 @@ class SeleniumArchiveBot:
             return None
         
         # Check for birthday commands first
-        if "birthday" in text.lower() or "test_birthday" in text.lower():
+        if "birthday" in text.lower() or "test_birthday" in text.lower() or "delete_birthday" in text.lower():
             return self.process_birthday_command(text, sender_name, sender_id, chat_id)
         
         # Check if message contains the word "archive" (case insensitive)
