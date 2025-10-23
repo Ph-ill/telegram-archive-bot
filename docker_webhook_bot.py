@@ -611,8 +611,7 @@ class SeleniumArchiveBot:
             url = f"{self.telegram_api_url}/sendMessage"
             data = {
                 'chat_id': chat_id,
-                'text': text,
-                'parse_mode': 'HTML'
+                'text': text
             }
             
             if reply_to_message_id:
