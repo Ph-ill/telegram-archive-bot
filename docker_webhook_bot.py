@@ -239,11 +239,15 @@ class SeleniumArchiveBot:
         if not self.is_bot_mentioned(text):
             return None
         
+        # Check if message contains the word "archive" (case insensitive)
+        if "archive" not in text.lower():
+            return None
+        
         logger.info(f"Processing archive request from {sender_name}")
         
         urls = self.extract_urls(text)
         if not urls:
-            return f"@{sender_name} I didn't find any URLs to archive in your message."
+            return f"@{sender_name} I found the word 'archive' but no URLs to archive in your message."
         
         archived_results = []
         for url in urls:
