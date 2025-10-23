@@ -604,7 +604,7 @@ class SeleniumArchiveBot:
         else:
             return f"@{sender_name} Here are your archived links:\n\n" + "\n\n".join(archived_results)
     
-    def send_message(self, chat_id, text, reply_to_message_id=None):
+    def send_message(self, chat_id, text, reply_to_message_id=None, disable_web_page_preview=False):
         """Send message via Telegram Bot API"""
         try:
             import requests
@@ -616,6 +616,9 @@ class SeleniumArchiveBot:
             
             if reply_to_message_id:
                 data['reply_to_message_id'] = reply_to_message_id
+            
+            if disable_web_page_preview:
+                data['disable_web_page_preview'] = True
             
             response = requests.post(url, json=data, timeout=30)
             
@@ -663,8 +666,9 @@ class SeleniumArchiveBot:
                 # Mark as processed
                 self.processed_messages.add(msg_key)
                 
-                # Send reply
-                success = self.send_message(chat_id, reply_text, message_id)
+                # Send reply (disable web page preview for help messages)
+                is_help_message = "Angel Dimi Bot Commands:" in reply_text
+                success = self.send_message(chat_id, reply_text, message_id, disable_web_page_preview=is_help_message)
                 if success:
                     logger.info(f"Successfully processed and replied to message {msg_key}")
                     # Save processed messages periodically
