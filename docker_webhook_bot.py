@@ -602,13 +602,28 @@ class SeleniumArchiveBot:
         return help_text
     
     def send_test_birthday_message(self, chat_id):
-        """Send test birthday message for @RacistWaluigi"""
+        """Send test birthday message using a random registered user and appropriate birthday message"""
         try:
-            age = 25  # Test age
-            message = f"🎈 It's @RacistWaluigi's birthday today! They're turning {age}! 🎉 Celebrate! 🎂"
+            # Load registered birthdays
+            birthdays = self.load_birthdays()
+            
+            if not birthdays:
+                return "❌ No registered birthdays found. Add some birthdays first to test the birthday message system."
+            
+            # Pick a random registered user
+            random_username = random.choice(list(birthdays.keys()))
+            user_data = birthdays[random_username]
+            
+            # Calculate their current age
+            age = self.calculate_age(user_data['date'])
+            
+            # Get appropriate birthday message using the birthday message system
+            message = self.get_birthday_message(random_username, age)
             
             # Get random birthday image
             image_path = self.get_random_birthday_image()
+            
+            test_header = f"🧪 TEST BIRTHDAY MESSAGE (using @{random_username}, age {age}):\n\n"
             
             if image_path:
                 # Send with image
@@ -619,19 +634,19 @@ class SeleniumArchiveBot:
                     files = {'animation': gif_file}
                     data = {
                         'chat_id': chat_id,
-                        'caption': f"🧪 TEST BIRTHDAY MESSAGE:\n\n{message}"
+                        'caption': f"{test_header}{message}"
                     }
                     response = requests.post(url, files=files, data=data, timeout=30)
                     
                     if response.status_code == 200:
-                        return "✅ Test birthday message sent!"
+                        return f"✅ Test birthday message sent using @{random_username}'s data!"
                     else:
                         return f"❌ Failed to send test message: {response.text}"
             else:
                 # Send text only
-                test_message = f"🧪 TEST BIRTHDAY MESSAGE:\n\n{message}"
+                test_message = f"{test_header}{message}"
                 success = self.send_message(chat_id, test_message)
-                return "✅ Test birthday message sent!" if success else "❌ Failed to send test message"
+                return f"✅ Test birthday message sent using @{random_username}'s data!" if success else "❌ Failed to send test message"
                 
         except Exception as e:
             logger.error(f"Error sending test birthday message: {e}")
