@@ -573,42 +573,43 @@ class SeleniumArchiveBot:
         
         # Archive commands (available to everyone)
         help_text += "📁 Archive Commands:\n"
-        help_text += "• /archive &lt;URL&gt; - Archive a link\n"
-        help_text += "  Example: /archive https://example.com\n\n"
+        help_text += "• /archive@Angel_Dimi_Bot &lt;URL&gt; - Archive a link\n"
+        help_text += "  Example: /archive@Angel_Dimi_Bot https://example.com\n\n"
         
         # Birthday commands (available to everyone for self)
         help_text += "🎂 Birthday Commands:\n"
-        help_text += "• /birthday_set &lt;YYYY-MM-DD&gt; &lt;Timezone&gt; [username] - Set birthday\n"
-        help_text += "  Example: /birthday_set 1990-03-15 America/New_York\n\n"
+        help_text += "• /birthday_set@Angel_Dimi_Bot &lt;YYYY-MM-DD&gt; &lt;Timezone&gt; [username] - Set birthday\n"
+        help_text += "  Example: /birthday_set@Angel_Dimi_Bot 1990-03-15 America/New_York\n\n"
         
         # Fun commands
         help_text += "🎯 Activity &amp; Fun Commands:\n"
-        help_text += "• /layla - Send a random Layla image\n"
-        help_text += "• /bored - Get a random activity suggestion\n"
-        help_text += "• /bored_type &lt;type&gt; - Get activity by type\n"
+        help_text += "• /layla@Angel_Dimi_Bot - Send a random Layla image\n"
+        help_text += "• /bored@Angel_Dimi_Bot - Get a random activity suggestion\n"
+        help_text += "• /bored_type@Angel_Dimi_Bot &lt;type&gt; - Get activity by type\n"
         help_text += "  Types: education, social, recreational, diy, charity, cooking, relaxation, music, busywork\n"
-        help_text += "• /bored_participants &lt;number&gt; - Get activity for specific number of people\n"
-        help_text += "• /bored_price &lt;range&gt; - Get activity by cost (free, low, medium, high)\n"
-        help_text += "• /age_guess &lt;name&gt; - Predict someone's age based on their name\n"
-        help_text += "  Example: /age_guess John\n\n"
+        help_text += "• /bored_participants@Angel_Dimi_Bot &lt;number&gt; - Get activity for specific number of people\n"
+        help_text += "• /bored_price@Angel_Dimi_Bot &lt;range&gt; - Get activity by cost (free, low, medium, high)\n"
+        help_text += "• /age_guess@Angel_Dimi_Bot &lt;name&gt; - Predict someone's age based on their name\n"
+        help_text += "  Example: /age_guess@Angel_Dimi_Bot John\n\n"
         
         # Special user commands
         if is_special_user:
             help_text += "👑 Admin Commands (Special Users Only):\n"
-            help_text += "• /test_birthday - Send test birthday message\n"
-            help_text += "• /delete_birthday &lt;username&gt; - Delete a birthday\n"
-            help_text += "• /list_birthdays - List all stored birthdays\n"
-            help_text += "• /add_birthday_message random \"message\" - Add random birthday message\n"
-            help_text += "• /add_birthday_message user &lt;username&gt; \"message\" - Add user-specific message\n"
-            help_text += "• /list_birthday_messages - View all birthday messages\n"
-            help_text += "• /delete_birthday_message random &lt;number&gt; - Delete random message\n"
-            help_text += "• /delete_birthday_message user &lt;username&gt; - Delete user message\n"
+            help_text += "• /test_birthday@Angel_Dimi_Bot - Send test birthday message\n"
+            help_text += "• /delete_birthday@Angel_Dimi_Bot &lt;username&gt; - Delete a birthday\n"
+            help_text += "• /list_birthdays@Angel_Dimi_Bot - List all stored birthdays\n"
+            help_text += "• /add_birthday_message@Angel_Dimi_Bot random \"message\" - Add random birthday message\n"
+            help_text += "• /add_birthday_message@Angel_Dimi_Bot user &lt;username&gt; \"message\" - Add user-specific message\n"
+            help_text += "• /list_birthday_messages@Angel_Dimi_Bot - View all birthday messages\n"
+            help_text += "• /delete_birthday_message@Angel_Dimi_Bot random &lt;number&gt; - Delete random message\n"
+            help_text += "• /delete_birthday_message@Angel_Dimi_Bot user &lt;username&gt; - Delete user message\n"
             help_text += "• Can set birthdays for any user\n\n"
         
         # Additional info
         help_text += "📝 Notes:\n"
+        help_text += "• In group chats: Use @Angel_Dimi_Bot (e.g., /help@Angel_Dimi_Bot)\n"
+        help_text += "• In private chats: @Angel_Dimi_Bot is optional (e.g., /help works)\n"
         help_text += "• Use / to see all available commands in your chat\n"
-        help_text += "• Works in groups and private messages\n"
         help_text += "• Birthday alerts sent to group at midnight in your timezone\n"
         help_text += "• Timezone list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
         
