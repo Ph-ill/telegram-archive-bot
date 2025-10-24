@@ -804,6 +804,9 @@ class SeleniumArchiveBot:
         elif command == "/birthday_set":
             return self.handle_birthday_set_command(args, sender_name, sender_username, sender_id)
         
+        elif command == "/layla":
+            return self.handle_layla_command(chat_id)
+        
         # Admin-only commands
         elif command in ["/test_birthday", "/delete_birthday", "/list_birthdays", "/add_birthday_message", 
                         "/list_birthday_messages", "/delete_birthday_message"]:
@@ -878,6 +881,48 @@ class SeleniumArchiveBot:
             return f"✅ Your birthday has been saved!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}"
         else:
             return f"✅ Birthday saved for @{target_username}!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}"
+    
+    def handle_layla_command(self, chat_id):
+        """Handle /layla command - send random image from layla_images folder"""
+        try:
+            import requests
+            
+            # Get layla_images folder path
+            image_folder = os.path.join(os.path.dirname(__file__), 'layla_images')
+            if not os.path.exists(image_folder):
+                return "❌ Layla images folder not found."
+            
+            # Get all image files (common formats)
+            image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.gif', '*.webp']
+            image_files = []
+            for extension in image_extensions:
+                image_files.extend(glob.glob(os.path.join(image_folder, extension)))
+                image_files.extend(glob.glob(os.path.join(image_folder, extension.upper())))
+            
+            if not image_files:
+                return "❌ No images found in layla_images folder."
+            
+            # Pick a random image
+            random_image = random.choice(image_files)
+            logger.info(f"Sending random Layla image: {os.path.basename(random_image)}")
+            
+            # Send the image
+            url = f"{self.telegram_api_url}/sendPhoto"
+            
+            with open(random_image, 'rb') as image_file:
+                files = {'photo': image_file}
+                data = {'chat_id': chat_id}
+                response = requests.post(url, files=files, data=data, timeout=30)
+                
+                if response.status_code == 200:
+                    return None  # Don't send text response when image is sent successfully
+                else:
+                    logger.error(f"Failed to send Layla image: {response.text}")
+                    return "❌ Failed to send Layla image."
+                    
+        except Exception as e:
+            logger.error(f"Error sending Layla image: {e}")
+            return f"❌ Error sending Layla image: {str(e)}"
     
     def handle_admin_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
         """Handle admin-only commands"""
@@ -1114,7 +1159,8 @@ class SeleniumArchiveBot:
                 {"command": "start", "description": "Start the bot and show help"},
                 {"command": "help", "description": "Show available commands"},
                 {"command": "archive", "description": "Archive a URL"},
-                {"command": "birthday_set", "description": "Set your birthday"}
+                {"command": "birthday_set", "description": "Set your birthday"},
+                {"command": "layla", "description": "Send a random Layla image"}
             ]
             
             # Admin commands for special users
@@ -1123,6 +1169,7 @@ class SeleniumArchiveBot:
                 {"command": "help", "description": "Show available commands"},
                 {"command": "archive", "description": "Archive a URL"},
                 {"command": "birthday_set", "description": "Set your birthday"},
+                {"command": "layla", "description": "Send a random Layla image"},
                 {"command": "test_birthday", "description": "Send test birthday message"},
                 {"command": "delete_birthday", "description": "Delete a user's birthday"},
                 {"command": "list_birthdays", "description": "List all stored birthdays"},
