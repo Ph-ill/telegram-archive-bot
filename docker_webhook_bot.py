@@ -291,22 +291,23 @@ class SeleniumArchiveBot:
             # Load existing birthdays
             birthdays = self.load_birthdays()
             
-            # Check if user already exists
+            # Check if user already exists and show update message
+            update_message = ""
             if target_username in birthdays:
                 existing = birthdays[target_username]
                 existing_age = self.calculate_age(existing['date'])
-                return f"@{sender_name} User @{target_username} already exists:\nBirthday: {existing['date']}\nTimezone: {existing['timezone']}\nCurrent age: {existing_age}\n\nReply with 'y' to replace this information."
+                update_message = f"\n\n📝 Updated from:\nOld Birthday: {existing['date']}\nOld Timezone: {existing['timezone']}\nOld Age: {existing_age}"
             
-            # Save new birthday
+            # Save new birthday (always save, whether new or update)
             birthdays[target_username] = birthday_data
             self.save_birthdays(birthdays)
             
             age = self.calculate_age(birthday_data['date'])
             
             if auth_type == "self":
-                return f"@{sender_name} ✅ Your birthday has been saved!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}"
+                return f"@{sender_name} ✅ Your birthday has been saved!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}"
             else:
-                return f"@{sender_name} ✅ Birthday saved for @{target_username}!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}"
+                return f"@{sender_name} ✅ Birthday saved for @{target_username}!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}"
         
         elif "delete_birthday" in text.lower():
             # Only special users can delete birthdays
