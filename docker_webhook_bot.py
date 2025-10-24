@@ -770,7 +770,7 @@ class SeleniumArchiveBot:
         logger.info(f"Processing slash command '{command}' from {sender_name}")
         
         # Route commands to appropriate handlers
-        if command == "/help":
+        if command == "/help" or command == "/start":
             return self.get_help_message(sender_name, sender_username)
         
         elif command == "/archive":
@@ -1086,6 +1086,7 @@ class SeleniumArchiveBot:
             
             # Basic commands for all users
             basic_commands = [
+                {"command": "start", "description": "Start the bot and show help"},
                 {"command": "help", "description": "Show available commands"},
                 {"command": "archive", "description": "Archive a URL"},
                 {"command": "birthday_set", "description": "Set your birthday"}
@@ -1093,6 +1094,7 @@ class SeleniumArchiveBot:
             
             # Admin commands for special users
             admin_commands = [
+                {"command": "start", "description": "Start the bot and show help"},
                 {"command": "help", "description": "Show available commands"},
                 {"command": "archive", "description": "Archive a URL"},
                 {"command": "birthday_set", "description": "Set your birthday"},
