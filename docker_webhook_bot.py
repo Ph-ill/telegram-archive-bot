@@ -458,8 +458,8 @@ class SeleniumArchiveBot:
         random_pattern = r'add_birthday_message\s+random\s+"([^"]+)"'
         random_match = re.search(random_pattern, text, re.IGNORECASE)
         
-        # Try user-specific message format
-        user_pattern = r'add_birthday_message\s+user\s+(\w+)\s+"([^"]+)"'
+        # Try user-specific message format (handle both @username and username)
+        user_pattern = r'add_birthday_message\s+user\s+@?(\w+)\s+"([^"]+)"'
         user_match = re.search(user_pattern, text, re.IGNORECASE)
         
         if random_match:
@@ -470,6 +470,7 @@ class SeleniumArchiveBot:
             return f"@{sender_name} ✅ Random birthday message added!\nMessage: {message_template}"
         
         elif user_match:
+            # Remove @ if present and convert to lowercase for consistent storage
             target_user = user_match.group(1).lower()
             message_template = user_match.group(2)
             messages = self.load_birthday_messages()
@@ -529,8 +530,8 @@ class SeleniumArchiveBot:
         random_pattern = r'delete_birthday_message\s+random\s+(\d+)'
         random_match = re.search(random_pattern, text, re.IGNORECASE)
         
-        # Try user-specific message deletion
-        user_pattern = r'delete_birthday_message\s+user\s+(\w+)'
+        # Try user-specific message deletion (handle both @username and username)
+        user_pattern = r'delete_birthday_message\s+user\s+@?(\w+)'
         user_match = re.search(user_pattern, text, re.IGNORECASE)
         
         if random_match:
@@ -546,6 +547,7 @@ class SeleniumArchiveBot:
                 return f"@{sender_name} ❌ Invalid message number. Use list_birthday_messages to see available messages."
         
         elif user_match:
+            # Remove @ if present and convert to lowercase for consistent lookup
             target_user = user_match.group(1).lower()
             messages = self.load_birthday_messages()
             user_specific = messages.get("user_specific", {})
