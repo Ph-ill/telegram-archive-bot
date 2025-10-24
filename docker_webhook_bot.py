@@ -588,7 +588,9 @@ class SeleniumArchiveBot:
         help_text += "• /bored_type &lt;type&gt; - Get activity by type\n"
         help_text += "  Types: education, social, recreational, diy, charity, cooking, relaxation, music, busywork\n"
         help_text += "• /bored_participants &lt;number&gt; - Get activity for specific number of people\n"
-        help_text += "• /bored_price &lt;range&gt; - Get activity by cost (free, low, medium, high)\n\n"
+        help_text += "• /bored_price &lt;range&gt; - Get activity by cost (free, low, medium, high)\n"
+        help_text += "• /age_guess &lt;name&gt; - Predict someone's age based on their name\n"
+        help_text += "  Example: /age_guess John\n\n"
         
         # Special user commands
         if is_special_user:
@@ -827,6 +829,9 @@ class SeleniumArchiveBot:
         
         elif command == "/bored_price":
             return self.handle_bored_price_command(args)
+        
+        elif command == "/age_guess":
+            return self.handle_age_guess_command(args)
         
         # Admin-only commands
         elif command in ["/test_birthday", "/delete_birthday", "/list_birthdays", "/add_birthday_message", 
@@ -1136,6 +1141,82 @@ class SeleniumArchiveBot:
             logger.error(f"Error getting bored activity by price: {e}")
             return "❌ Error getting activity suggestion. Please try again later."
     
+    def handle_age_guess_command(self, args):
+        """Handle /age_guess command - predict age based on name using Agify API"""
+        if not args.strip():
+            return "Please provide a name to guess the age for.\n\n" \
+                   "<b>Examples:</b>\n" \
+                   "• /age_guess John\n" \
+                   "• /age_guess Sarah\n" \
+                   "• /age_guess Michael\n\n" \
+                   "<b>Note:</b> This uses statistical data and may not be accurate for individuals."
+        
+        name = args.strip().title()  # Capitalize first letter for better display
+        
+        # Basic name validation
+        if not name.replace(' ', '').replace('-', '').isalpha():
+            return "❌ Please provide a valid name (letters only).\nExample: /age_guess John"
+        
+        if len(name) > 50:
+            return "❌ Name is too long. Please provide a shorter name."
+        
+        try:
+            import requests
+            
+            # Use the first name only for the API call
+            first_name = name.split()[0].lower()
+            
+            response = requests.get(f"https://api.agify.io?name={first_name}", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                predicted_age = data.get('age')
+                count = data.get('count', 0)
+                
+                if predicted_age is None:
+                    return f"🤔 <b>Age Prediction for {name}:</b>\n\n" \
+                           f"❌ Sorry, I couldn't find enough data to predict the age for the name '{name}'.\n\n" \
+                           f"This might happen with very rare or unique names."
+                
+                # Add confidence indicator based on count
+                if count < 100:
+                    confidence = "Low confidence"
+                    confidence_emoji = "🤷"
+                elif count < 1000:
+                    confidence = "Medium confidence"
+                    confidence_emoji = "🤔"
+                else:
+                    confidence = "High confidence"
+                    confidence_emoji = "✅"
+                
+                # Add age range description
+                if predicted_age < 18:
+                    age_group = "Young person"
+                elif predicted_age < 30:
+                    age_group = "Young adult"
+                elif predicted_age < 50:
+                    age_group = "Adult"
+                elif predicted_age < 65:
+                    age_group = "Middle-aged"
+                else:
+                    age_group = "Senior"
+                
+                return f"🎯 <b>Age Prediction for {name}:</b>\n\n" \
+                       f"<b>Predicted Age:</b> {predicted_age} years old\n" \
+                       f"<b>Age Group:</b> {age_group}\n" \
+                       f"<b>Confidence:</b> {confidence_emoji} {confidence}\n" \
+                       f"<b>Based on:</b> {count:,} data points\n\n" \
+                       f"<i>💡 This is based on statistical data from people with this name and may not reflect individual cases.</i>"
+            
+            elif response.status_code == 429:
+                return "❌ Too many requests. Please wait a moment and try again."
+            else:
+                return "❌ Failed to get age prediction. Please try again later."
+                
+        except Exception as e:
+            logger.error(f"Error getting age prediction: {e}")
+            return "❌ Error getting age prediction. Please try again later."
+    
     def handle_admin_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
         """Handle admin-only commands"""
         # Check if user is admin
@@ -1376,7 +1457,8 @@ class SeleniumArchiveBot:
                 {"command": "bored", "description": "Get a random activity suggestion"},
                 {"command": "bored_type", "description": "Get activity by type (education, social, etc.)"},
                 {"command": "bored_participants", "description": "Get activity by number of people"},
-                {"command": "bored_price", "description": "Get activity by price range (free, low, high)"}
+                {"command": "bored_price", "description": "Get activity by price range (free, low, high)"},
+                {"command": "age_guess", "description": "Guess someone's age based on their name"}
             ]
             
             # Admin commands for special users
@@ -1390,6 +1472,7 @@ class SeleniumArchiveBot:
                 {"command": "bored_type", "description": "Get activity by type (education, social, etc.)"},
                 {"command": "bored_participants", "description": "Get activity by number of people"},
                 {"command": "bored_price", "description": "Get activity by price range (free, low, high)"},
+                {"command": "age_guess", "description": "Guess someone's age based on their name"},
                 {"command": "test_birthday", "description": "Send test birthday message"},
                 {"command": "delete_birthday", "description": "Delete a user's birthday"},
                 {"command": "list_birthdays", "description": "List all stored birthdays"},
