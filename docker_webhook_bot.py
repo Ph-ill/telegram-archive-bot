@@ -242,10 +242,63 @@ class SeleniumArchiveBot:
             logger.error(f"Error getting birthday image: {e}")
             return None
     
+    def load_birthday_messages(self):
+        """Load birthday messages from JSON file"""
+        messages_file = os.path.join(self.data_dir, "birthday_messages.json")
+        try:
+            with open(messages_file, 'r') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            # Return default structure if file doesn't exist
+            return {
+                "random_messages": [
+                    "🎈 It's @{username}'s birthday today! They're turning {age}! 🎉 Celebrate! 🎂",
+                    "🎂 Happy Birthday @{username}! Welcome to {age}! 🎉🎈",
+                    "🎉 @{username} is {age} today! Time to party! 🎂🎈"
+                ],
+                "user_specific": {}
+            }
+        except Exception as e:
+            logger.error(f"Error loading birthday messages: {e}")
+            return {"random_messages": [], "user_specific": {}}
+    
+    def save_birthday_messages(self, messages):
+        """Save birthday messages to JSON file"""
+        messages_file = os.path.join(self.data_dir, "birthday_messages.json")
+        try:
+            os.makedirs(os.path.dirname(messages_file), exist_ok=True)
+            with open(messages_file, 'w') as f:
+                json.dump(messages, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving birthday messages: {e}")
+    
+    def get_birthday_message(self, username, age):
+        """Get appropriate birthday message for user"""
+        try:
+            messages = self.load_birthday_messages()
+            
+            # Check for user-specific message first
+            if username.lower() in messages.get("user_specific", {}):
+                message_template = messages["user_specific"][username.lower()]
+                return message_template.format(username=username, age=age)
+            
+            # Use random message if no user-specific message
+            random_messages = messages.get("random_messages", [])
+            if random_messages:
+                message_template = random.choice(random_messages)
+                return message_template.format(username=username, age=age)
+            
+            # Fallback message if no messages configured
+            return f"🎈 It's @{username}'s birthday today! They're turning {age}! 🎉 Celebrate! 🎂"
+            
+        except Exception as e:
+            logger.error(f"Error getting birthday message: {e}")
+            return f"🎈 It's @{username}'s birthday today! They're turning {age}! 🎉 Celebrate! 🎂"
+    
     def send_birthday_message(self, username, age, chat_id=-1002220894500):
         """Send birthday message to group chat"""
         try:
-            message = f"🎈 It's @{username}'s birthday today! They're turning {age}! 🎉 Celebrate! 🎂"
+            message = self.get_birthday_message(username, age)
             
             # Get random birthday image
             image_path = self.get_random_birthday_image()
@@ -373,11 +426,139 @@ class SeleniumArchiveBot:
             
             return header + "\n".join(birthday_list)
         
+        elif "add_birthday_message" in text.lower():
+            return self.process_add_birthday_message(text, sender_name, sender_username)
+        
+        elif "list_birthday_messages" in text.lower():
+            return self.process_list_birthday_messages(sender_name, sender_username)
+        
+        elif "delete_birthday_message" in text.lower():
+            return self.process_delete_birthday_message(text, sender_name, sender_username)
+        
         elif "test_birthday" in text.lower():
             # Send test birthday message to current chat
             return self.send_test_birthday_message(chat_id)
         
         return None
+    
+    def process_add_birthday_message(self, text, sender_name, sender_username):
+        """Process add birthday message command"""
+        # Only special users can manage birthday messages
+        special_users = ["racistwaluigi", "kokorozasu"]
+        if sender_username.lower() not in special_users:
+            return f"@{sender_name} Only @RacistWaluigi and @kokorozasu can manage birthday messages."
+        
+        # Parse command formats:
+        # @Angel_Dimi_Bot add_birthday_message random "Happy birthday @{{username}}! You're {{age}} today! 🎉"
+        # @Angel_Dimi_Bot add_birthday_message user racistwaluigi "Special birthday message for you @{{username}}! {{age}} years of awesome! 🎂"
+        
+        import re
+        
+        # Try random message format
+        random_pattern = r'add_birthday_message\s+random\s+"([^"]+)"'
+        random_match = re.search(random_pattern, text, re.IGNORECASE)
+        
+        # Try user-specific message format
+        user_pattern = r'add_birthday_message\s+user\s+(\w+)\s+"([^"]+)"'
+        user_match = re.search(user_pattern, text, re.IGNORECASE)
+        
+        if random_match:
+            message_template = random_match.group(1)
+            messages = self.load_birthday_messages()
+            messages["random_messages"].append(message_template)
+            self.save_birthday_messages(messages)
+            return f"@{sender_name} ✅ Random birthday message added!\nMessage: {message_template}"
+        
+        elif user_match:
+            target_user = user_match.group(1).lower()
+            message_template = user_match.group(2)
+            messages = self.load_birthday_messages()
+            messages["user_specific"][target_user] = message_template
+            self.save_birthday_messages(messages)
+            return f"@{sender_name} ✅ User-specific birthday message added for @{target_user}!\nMessage: {message_template}"
+        
+        else:
+            return f"@{sender_name} Invalid format. Use:\n• @Angel_Dimi_Bot add_birthday_message random \"Your message with {{username}} and {{age}}\"\n• @Angel_Dimi_Bot add_birthday_message user username \"User-specific message with {{username}} and {{age}}\"\n\nNote: Use {{username}} and {{age}} as placeholders in your message."
+    
+    def process_list_birthday_messages(self, sender_name, sender_username):
+        """Process list birthday messages command"""
+        # Only special users can view birthday messages
+        special_users = ["racistwaluigi", "kokorozasu"]
+        if sender_username.lower() not in special_users:
+            return f"@{sender_name} Only @RacistWaluigi and @kokorozasu can view birthday messages."
+        
+        messages = self.load_birthday_messages()
+        
+        result = f"@{sender_name} 📝 Birthday Messages:\n\n"
+        
+        # Random messages
+        random_messages = messages.get("random_messages", [])
+        if random_messages:
+            result += f"🎲 Random Messages ({len(random_messages)}):\n"
+            for i, msg in enumerate(random_messages, 1):
+                result += f"{i}. {msg}\n"
+            result += "\n"
+        else:
+            result += "🎲 Random Messages: None\n\n"
+        
+        # User-specific messages
+        user_specific = messages.get("user_specific", {})
+        if user_specific:
+            result += f"👤 User-Specific Messages ({len(user_specific)}):\n"
+            for username, msg in user_specific.items():
+                result += f"@{username}: {msg}\n"
+        else:
+            result += "👤 User-Specific Messages: None"
+        
+        return result
+    
+    def process_delete_birthday_message(self, text, sender_name, sender_username):
+        """Process delete birthday message command"""
+        # Only special users can manage birthday messages
+        special_users = ["racistwaluigi", "kokorozasu"]
+        if sender_username.lower() not in special_users:
+            return f"@{sender_name} Only @RacistWaluigi and @kokorozasu can manage birthday messages."
+        
+        import re
+        
+        # Parse command formats:
+        # @Angel_Dimi_Bot delete_birthday_message random 1
+        # @Angel_Dimi_Bot delete_birthday_message user racistwaluigi
+        
+        # Try random message deletion
+        random_pattern = r'delete_birthday_message\s+random\s+(\d+)'
+        random_match = re.search(random_pattern, text, re.IGNORECASE)
+        
+        # Try user-specific message deletion
+        user_pattern = r'delete_birthday_message\s+user\s+(\w+)'
+        user_match = re.search(user_pattern, text, re.IGNORECASE)
+        
+        if random_match:
+            index = int(random_match.group(1)) - 1  # Convert to 0-based index
+            messages = self.load_birthday_messages()
+            random_messages = messages.get("random_messages", [])
+            
+            if 0 <= index < len(random_messages):
+                deleted_message = random_messages.pop(index)
+                self.save_birthday_messages(messages)
+                return f"@{sender_name} ✅ Random birthday message #{index + 1} deleted!\nDeleted: {deleted_message}"
+            else:
+                return f"@{sender_name} ❌ Invalid message number. Use list_birthday_messages to see available messages."
+        
+        elif user_match:
+            target_user = user_match.group(1).lower()
+            messages = self.load_birthday_messages()
+            user_specific = messages.get("user_specific", {})
+            
+            if target_user in user_specific:
+                deleted_message = user_specific.pop(target_user)
+                self.save_birthday_messages(messages)
+                return f"@{sender_name} ✅ User-specific birthday message for @{target_user} deleted!\nDeleted: {deleted_message}"
+            else:
+                return f"@{sender_name} ❌ No user-specific message found for @{target_user}."
+        
+        else:
+            return f"@{sender_name} Invalid format. Use:\n• @Angel_Dimi_Bot delete_birthday_message random [number]\n• @Angel_Dimi_Bot delete_birthday_message user [username]\n\nUse list_birthday_messages to see available messages."
     
     def get_help_message(self, sender_name, sender_username):
         """Generate help message with available commands"""
@@ -403,6 +584,11 @@ class SeleniumArchiveBot:
             help_text += "👑 Admin Commands (Special Users Only):\n"
             help_text += "• @Angel_Dimi_Bot delete_birthday @username - Delete a birthday\n"
             help_text += "• @Angel_Dimi_Bot list_birthdays - List all stored birthdays\n"
+            help_text += "• @Angel_Dimi_Bot add_birthday_message random \"message\" - Add random birthday message\n"
+            help_text += "• @Angel_Dimi_Bot add_birthday_message user username \"message\" - Add user-specific message\n"
+            help_text += "• @Angel_Dimi_Bot list_birthday_messages - View all birthday messages\n"
+            help_text += "• @Angel_Dimi_Bot delete_birthday_message random [number] - Delete random message\n"
+            help_text += "• @Angel_Dimi_Bot delete_birthday_message user [username] - Delete user message\n"
             help_text += "• Can set birthdays for any user\n\n"
         
         # Help commands
@@ -578,7 +764,9 @@ class SeleniumArchiveBot:
             return self.get_help_message(sender_name, sender_username)
         
         # Check for birthday commands
-        if "birthday" in text.lower() or "test_birthday" in text.lower() or "delete_birthday" in text.lower() or "list_birthdays" in text.lower():
+        birthday_commands = ["birthday", "test_birthday", "delete_birthday", "list_birthdays", 
+                           "add_birthday_message", "list_birthday_messages", "delete_birthday_message"]
+        if any(cmd in text.lower() for cmd in birthday_commands):
             return self.process_birthday_command(text, sender_name, sender_username, sender_id, chat_id)
         
         # Check if message contains the word "archive" (case insensitive)
