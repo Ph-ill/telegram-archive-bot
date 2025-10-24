@@ -579,12 +579,21 @@ class SeleniumArchiveBot:
         # Birthday commands (available to everyone for self)
         help_text += "🎂 Birthday Commands:\n"
         help_text += "• /birthday_set &lt;YYYY-MM-DD&gt; &lt;Timezone&gt; [username] - Set birthday\n"
-        help_text += "  Example: /birthday_set 1990-03-15 America/New_York\n"
-        help_text += "• /test_birthday - Send test birthday message\n\n"
+        help_text += "  Example: /birthday_set 1990-03-15 America/New_York\n\n"
+        
+        # Fun commands
+        help_text += "🎯 Activity &amp; Fun Commands:\n"
+        help_text += "• /layla - Send a random Layla image\n"
+        help_text += "• /bored - Get a random activity suggestion\n"
+        help_text += "• /bored_type &lt;type&gt; - Get activity by type\n"
+        help_text += "  Types: education, social, recreational, diy, charity, cooking, relaxation, music, busywork\n"
+        help_text += "• /bored_participants &lt;number&gt; - Get activity for specific number of people\n"
+        help_text += "• /bored_price &lt;range&gt; - Get activity by cost (free, low, medium, high)\n\n"
         
         # Special user commands
         if is_special_user:
             help_text += "👑 Admin Commands (Special Users Only):\n"
+            help_text += "• /test_birthday - Send test birthday message\n"
             help_text += "• /delete_birthday &lt;username&gt; - Delete a birthday\n"
             help_text += "• /list_birthdays - List all stored birthdays\n"
             help_text += "• /add_birthday_message random \"message\" - Add random birthday message\n"
@@ -807,6 +816,18 @@ class SeleniumArchiveBot:
         elif command == "/layla":
             return self.handle_layla_command(chat_id)
         
+        elif command == "/bored":
+            return self.handle_bored_command()
+        
+        elif command == "/bored_type":
+            return self.handle_bored_type_command(args)
+        
+        elif command == "/bored_participants":
+            return self.handle_bored_participants_command(args)
+        
+        elif command == "/bored_price":
+            return self.handle_bored_price_command(args)
+        
         # Admin-only commands
         elif command in ["/test_birthday", "/delete_birthday", "/list_birthdays", "/add_birthday_message", 
                         "/list_birthday_messages", "/delete_birthday_message"]:
@@ -923,6 +944,197 @@ class SeleniumArchiveBot:
         except Exception as e:
             logger.error(f"Error sending Layla image: {e}")
             return f"❌ Error sending Layla image: {str(e)}"
+    
+    def handle_bored_command(self):
+        """Handle /bored command - get a random activity"""
+        try:
+            import requests
+            
+            response = requests.get("https://apis.scrimba.com/bored/api/activity", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                activity = data.get('activity', 'No activity found')
+                activity_type = data.get('type', 'Unknown').title()
+                participants = data.get('participants', 'Unknown')
+                price = data.get('price', 0)
+                
+                # Format price description
+                if price == 0:
+                    price_desc = "Free"
+                elif price <= 0.3:
+                    price_desc = "Low cost"
+                elif price <= 0.6:
+                    price_desc = "Medium cost"
+                else:
+                    price_desc = "High cost"
+                
+                return f"🎯 <b>Random Activity Suggestion:</b>\n\n" \
+                       f"<b>Activity:</b> {activity}\n" \
+                       f"<b>Type:</b> {activity_type}\n" \
+                       f"<b>Participants:</b> {participants}\n" \
+                       f"<b>Cost:</b> {price_desc}"
+            else:
+                return "❌ Failed to get activity suggestion. Please try again later."
+                
+        except Exception as e:
+            logger.error(f"Error getting bored activity: {e}")
+            return "❌ Error getting activity suggestion. Please try again later."
+    
+    def handle_bored_type_command(self, args):
+        """Handle /bored_type command - get activity by type"""
+        if not args.strip():
+            return "Please specify an activity type.\n\n" \
+                   "<b>Available types:</b>\n" \
+                   "• education - Learn something new\n" \
+                   "• recreational - Fun and games\n" \
+                   "• social - Activities with others\n" \
+                   "• diy - Do-it-yourself projects\n" \
+                   "• charity - Help others\n" \
+                   "• cooking - Food and recipes\n" \
+                   "• relaxation - Chill and unwind\n" \
+                   "• music - Musical activities\n" \
+                   "• busywork - Productive tasks\n\n" \
+                   "<b>Example:</b> /bored_type social"
+        
+        activity_type = args.strip().lower()
+        valid_types = ['education', 'recreational', 'social', 'diy', 'charity', 'cooking', 'relaxation', 'music', 'busywork']
+        
+        if activity_type not in valid_types:
+            return f"❌ Invalid activity type '{activity_type}'.\n\n" \
+                   f"Valid types: {', '.join(valid_types)}"
+        
+        try:
+            import requests
+            
+            response = requests.get(f"https://apis.scrimba.com/bored/api/activity?type={activity_type}", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                activity = data.get('activity', 'No activity found')
+                participants = data.get('participants', 'Unknown')
+                price = data.get('price', 0)
+                
+                # Format price description
+                if price == 0:
+                    price_desc = "Free"
+                elif price <= 0.3:
+                    price_desc = "Low cost"
+                elif price <= 0.6:
+                    price_desc = "Medium cost"
+                else:
+                    price_desc = "High cost"
+                
+                return f"🎯 <b>{activity_type.title()} Activity:</b>\n\n" \
+                       f"<b>Activity:</b> {activity}\n" \
+                       f"<b>Participants:</b> {participants}\n" \
+                       f"<b>Cost:</b> {price_desc}"
+            else:
+                return f"❌ No {activity_type} activities found. Please try again."
+                
+        except Exception as e:
+            logger.error(f"Error getting bored activity by type: {e}")
+            return "❌ Error getting activity suggestion. Please try again later."
+    
+    def handle_bored_participants_command(self, args):
+        """Handle /bored_participants command - get activity by number of participants"""
+        if not args.strip():
+            return "Please specify the number of participants.\n\n" \
+                   "<b>Examples:</b>\n" \
+                   "• /bored_participants 1 - Solo activities\n" \
+                   "• /bored_participants 2 - Activities for two people\n" \
+                   "• /bored_participants 4 - Group activities\n\n" \
+                   "<b>Note:</b> You can specify any number from 1 to 8"
+        
+        try:
+            participants = int(args.strip())
+            if participants < 1 or participants > 8:
+                return "❌ Number of participants must be between 1 and 8."
+        except ValueError:
+            return "❌ Please provide a valid number of participants.\nExample: /bored_participants 2"
+        
+        try:
+            import requests
+            
+            response = requests.get(f"https://apis.scrimba.com/bored/api/activity?participants={participants}", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                activity = data.get('activity', 'No activity found')
+                activity_type = data.get('type', 'Unknown').title()
+                price = data.get('price', 0)
+                
+                # Format price description
+                if price == 0:
+                    price_desc = "Free"
+                elif price <= 0.3:
+                    price_desc = "Low cost"
+                elif price <= 0.6:
+                    price_desc = "Medium cost"
+                else:
+                    price_desc = "High cost"
+                
+                participant_text = "person" if participants == 1 else "people"
+                
+                return f"🎯 <b>Activity for {participants} {participant_text}:</b>\n\n" \
+                       f"<b>Activity:</b> {activity}\n" \
+                       f"<b>Type:</b> {activity_type}\n" \
+                       f"<b>Cost:</b> {price_desc}"
+            else:
+                return f"❌ No activities found for {participants} participants. Please try a different number."
+                
+        except Exception as e:
+            logger.error(f"Error getting bored activity by participants: {e}")
+            return "❌ Error getting activity suggestion. Please try again later."
+    
+    def handle_bored_price_command(self, args):
+        """Handle /bored_price command - get activity by price range"""
+        if not args.strip():
+            return "Please specify a price range.\n\n" \
+                   "<b>Available price ranges:</b>\n" \
+                   "• free - Completely free activities\n" \
+                   "• low - Low cost activities\n" \
+                   "• medium - Medium cost activities\n" \
+                   "• high - Higher cost activities\n\n" \
+                   "<b>Example:</b> /bored_price free"
+        
+        price_range = args.strip().lower()
+        
+        # Map price ranges to API values
+        price_mapping = {
+            'free': (0, 0),
+            'low': (0.1, 0.3),
+            'medium': (0.4, 0.6),
+            'high': (0.7, 1.0)
+        }
+        
+        if price_range not in price_mapping:
+            return f"❌ Invalid price range '{price_range}'.\n\n" \
+                   f"Valid ranges: {', '.join(price_mapping.keys())}"
+        
+        min_price, max_price = price_mapping[price_range]
+        
+        try:
+            import requests
+            
+            response = requests.get(f"https://apis.scrimba.com/bored/api/activity?minprice={min_price}&maxprice={max_price}", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                activity = data.get('activity', 'No activity found')
+                activity_type = data.get('type', 'Unknown').title()
+                participants = data.get('participants', 'Unknown')
+                
+                return f"🎯 <b>{price_range.title()} Cost Activity:</b>\n\n" \
+                       f"<b>Activity:</b> {activity}\n" \
+                       f"<b>Type:</b> {activity_type}\n" \
+                       f"<b>Participants:</b> {participants}"
+            else:
+                return f"❌ No {price_range} cost activities found. Please try again."
+                
+        except Exception as e:
+            logger.error(f"Error getting bored activity by price: {e}")
+            return "❌ Error getting activity suggestion. Please try again later."
     
     def handle_admin_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
         """Handle admin-only commands"""
@@ -1160,7 +1372,11 @@ class SeleniumArchiveBot:
                 {"command": "help", "description": "Show available commands"},
                 {"command": "archive", "description": "Archive a URL"},
                 {"command": "birthday_set", "description": "Set your birthday"},
-                {"command": "layla", "description": "Send a random Layla image"}
+                {"command": "layla", "description": "Send a random Layla image"},
+                {"command": "bored", "description": "Get a random activity suggestion"},
+                {"command": "bored_type", "description": "Get activity by type (education, social, etc.)"},
+                {"command": "bored_participants", "description": "Get activity by number of people"},
+                {"command": "bored_price", "description": "Get activity by price range (free, low, high)"}
             ]
             
             # Admin commands for special users
@@ -1170,6 +1386,10 @@ class SeleniumArchiveBot:
                 {"command": "archive", "description": "Archive a URL"},
                 {"command": "birthday_set", "description": "Set your birthday"},
                 {"command": "layla", "description": "Send a random Layla image"},
+                {"command": "bored", "description": "Get a random activity suggestion"},
+                {"command": "bored_type", "description": "Get activity by type (education, social, etc.)"},
+                {"command": "bored_participants", "description": "Get activity by number of people"},
+                {"command": "bored_price", "description": "Get activity by price range (free, low, high)"},
                 {"command": "test_birthday", "description": "Send test birthday message"},
                 {"command": "delete_birthday", "description": "Delete a user's birthday"},
                 {"command": "list_birthdays", "description": "List all stored birthdays"},
