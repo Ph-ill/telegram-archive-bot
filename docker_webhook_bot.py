@@ -565,37 +565,39 @@ class SeleniumArchiveBot:
         special_users = ["racistwaluigi", "kokorozasu"]
         is_special_user = sender_username.lower() in special_users
         
-        help_text = f"🤖 Angel Dimi Bot Commands:\n\n> "
+        help_text = f"🤖 Angel Dimi Bot Commands:\n\n<blockquote expandable>"
         
         # Archive commands (available to everyone)
-        help_text += "📁 Archive Commands:\n> "
-        help_text += "• /archive <URL> - Archive a link\n> "
-        help_text += "  Example: /archive https://example.com\n> \n> "
+        help_text += "📁 Archive Commands:\n"
+        help_text += "• /archive &lt;URL&gt; - Archive a link\n"
+        help_text += "  Example: /archive https://example.com\n\n"
         
         # Birthday commands (available to everyone for self)
-        help_text += "🎂 Birthday Commands:\n> "
-        help_text += "• /birthday_set <YYYY-MM-DD> <Timezone> [username] - Set birthday\n> "
-        help_text += "  Example: /birthday_set 1990-03-15 America/New_York\n> "
-        help_text += "• /test_birthday - Send test birthday message\n> \n> "
+        help_text += "🎂 Birthday Commands:\n"
+        help_text += "• /birthday_set &lt;YYYY-MM-DD&gt; &lt;Timezone&gt; [username] - Set birthday\n"
+        help_text += "  Example: /birthday_set 1990-03-15 America/New_York\n"
+        help_text += "• /test_birthday - Send test birthday message\n\n"
         
         # Special user commands
         if is_special_user:
-            help_text += "👑 Admin Commands (Special Users Only):\n> "
-            help_text += "• /delete_birthday <username> - Delete a birthday\n> "
-            help_text += "• /list_birthdays - List all stored birthdays\n> "
-            help_text += "• /add_birthday_message random \"message\" - Add random birthday message\n> "
-            help_text += "• /add_birthday_message user <username> \"message\" - Add user-specific message\n> "
-            help_text += "• /list_birthday_messages - View all birthday messages\n> "
-            help_text += "• /delete_birthday_message random <number> - Delete random message\n> "
-            help_text += "• /delete_birthday_message user <username> - Delete user message\n> "
-            help_text += "• Can set birthdays for any user\n> \n> "
+            help_text += "👑 Admin Commands (Special Users Only):\n"
+            help_text += "• /delete_birthday &lt;username&gt; - Delete a birthday\n"
+            help_text += "• /list_birthdays - List all stored birthdays\n"
+            help_text += "• /add_birthday_message random \"message\" - Add random birthday message\n"
+            help_text += "• /add_birthday_message user &lt;username&gt; \"message\" - Add user-specific message\n"
+            help_text += "• /list_birthday_messages - View all birthday messages\n"
+            help_text += "• /delete_birthday_message random &lt;number&gt; - Delete random message\n"
+            help_text += "• /delete_birthday_message user &lt;username&gt; - Delete user message\n"
+            help_text += "• Can set birthdays for any user\n\n"
         
         # Additional info
-        help_text += "📝 Notes:\n> "
-        help_text += "• Use / to see all available commands in your chat\n> "
-        help_text += "• Works in groups and private messages\n> "
-        help_text += "• Birthday alerts sent to group at midnight in your timezone\n> "
+        help_text += "📝 Notes:\n"
+        help_text += "• Use / to see all available commands in your chat\n"
+        help_text += "• Works in groups and private messages\n"
+        help_text += "• Birthday alerts sent to group at midnight in your timezone\n"
         help_text += "• Timezone list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
+        
+        help_text += "</blockquote>"
         
         return help_text
     
@@ -958,7 +960,8 @@ class SeleniumArchiveBot:
             url = f"{self.telegram_api_url}/sendMessage"
             data = {
                 'chat_id': chat_id,
-                'text': text
+                'text': text,
+                'parse_mode': 'HTML'
             }
             
             if reply_to_message_id:
