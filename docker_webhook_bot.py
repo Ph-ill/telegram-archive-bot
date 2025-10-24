@@ -781,6 +781,12 @@ class SeleniumArchiveBot:
             # Only respond if the command is directed at this bot
             if target_bot.lower() != self.bot_username.lower():
                 return None  # Ignore commands for other bots
+        else:
+            # Generic command without bot specification (e.g., /help)
+            # In group chats, only respond to commands explicitly directed at this bot
+            # In private chats (chat_id > 0), we can respond to generic commands
+            if chat_id and chat_id < 0:  # Negative chat_id means group/channel
+                return None  # Ignore generic commands in groups
         
         logger.info(f"Processing slash command '{command}' from {sender_name}")
         
