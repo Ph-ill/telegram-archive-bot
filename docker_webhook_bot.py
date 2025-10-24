@@ -565,42 +565,36 @@ class SeleniumArchiveBot:
         special_users = ["racistwaluigi", "kokorozasu"]
         is_special_user = sender_username.lower() in special_users
         
-        help_text = f"@{sender_name} 🤖 Angel Dimi Bot Commands:\n\n"
+        help_text = f"🤖 Angel Dimi Bot Commands:\n\n> "
         
         # Archive commands (available to everyone)
-        help_text += "📁 Archive Commands:\n"
-        help_text += "• @Angel_Dimi_Bot archive URL - Archive a link\n"
-        help_text += "  Example: @Angel_Dimi_Bot archive https://example.com\n\n"
+        help_text += "📁 Archive Commands:\n> "
+        help_text += "• /archive <URL> - Archive a link\n> "
+        help_text += "  Example: /archive https://example.com\n> \n> "
         
         # Birthday commands (available to everyone for self)
-        help_text += "🎂 Birthday Commands:\n"
-        help_text += "• @Angel_Dimi_Bot birthday set YYYY-MM-DD Timezone [username]\n"
-        help_text += "  Set birthday (omit username to set your own)\n"
-        help_text += "  Example: @Angel_Dimi_Bot birthday set 1990-03-15 America/New_York\n"
-        help_text += "• @Angel_Dimi_Bot test_birthday - Send test birthday message\n\n"
+        help_text += "🎂 Birthday Commands:\n> "
+        help_text += "• /birthday_set <YYYY-MM-DD> <Timezone> [username] - Set birthday\n> "
+        help_text += "  Example: /birthday_set 1990-03-15 America/New_York\n> "
+        help_text += "• /test_birthday - Send test birthday message\n> \n> "
         
         # Special user commands
         if is_special_user:
-            help_text += "👑 Admin Commands (Special Users Only):\n"
-            help_text += "• @Angel_Dimi_Bot delete_birthday @username - Delete a birthday\n"
-            help_text += "• @Angel_Dimi_Bot list_birthdays - List all stored birthdays\n"
-            help_text += "• @Angel_Dimi_Bot add_birthday_message random \"message\" - Add random birthday message\n"
-            help_text += "• @Angel_Dimi_Bot add_birthday_message user username \"message\" - Add user-specific message\n"
-            help_text += "• @Angel_Dimi_Bot list_birthday_messages - View all birthday messages\n"
-            help_text += "• @Angel_Dimi_Bot delete_birthday_message random [number] - Delete random message\n"
-            help_text += "• @Angel_Dimi_Bot delete_birthday_message user [username] - Delete user message\n"
-            help_text += "• Can set birthdays for any user\n\n"
-        
-        # Help commands
-        help_text += "ℹ️ Help Commands:\n"
-        help_text += "• @Angel_Dimi_Bot help - Show this help message\n"
-        help_text += "• @Angel_Dimi_Bot list - Show available commands\n"
-        help_text += "• @Angel_Dimi_Bot / - Show command summary\n\n"
+            help_text += "👑 Admin Commands (Special Users Only):\n> "
+            help_text += "• /delete_birthday <username> - Delete a birthday\n> "
+            help_text += "• /list_birthdays - List all stored birthdays\n> "
+            help_text += "• /add_birthday_message random \"message\" - Add random birthday message\n> "
+            help_text += "• /add_birthday_message user <username> \"message\" - Add user-specific message\n> "
+            help_text += "• /list_birthday_messages - View all birthday messages\n> "
+            help_text += "• /delete_birthday_message random <number> - Delete random message\n> "
+            help_text += "• /delete_birthday_message user <username> - Delete user message\n> "
+            help_text += "• Can set birthdays for any user\n> \n> "
         
         # Additional info
-        help_text += "📝 Notes:\n"
-        help_text += "• Works in groups and private messages\n"
-        help_text += "• Birthday alerts sent to group at midnight in your timezone\n"
+        help_text += "📝 Notes:\n> "
+        help_text += "• Use / to see all available commands in your chat\n> "
+        help_text += "• Works in groups and private messages\n> "
+        help_text += "• Birthday alerts sent to group at midnight in your timezone\n> "
         help_text += "• Timezone list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
         
         return help_text
@@ -750,34 +744,47 @@ class SeleniumArchiveBot:
                 except:
                     pass
     
-    def process_message_for_archives(self, text, sender_name="User", sender_username=None, sender_id=None, chat_id=None):
-        """Process message for archive requests and other commands"""
-        if not self.is_bot_mentioned(text):
+    def process_slash_command(self, text, sender_name="User", sender_username=None, sender_id=None, chat_id=None):
+        """Process slash commands"""
+        if not text.startswith('/'):
             return None
         
-        # Check for help commands first (but not list_birthdays)
-        help_keywords = ["help", "/"]
-        if "list_birthdays" not in text.lower() and any(cmd in text.lower() for cmd in help_keywords) and len(text.strip()) < 50:
+        # Parse command and arguments
+        parts = text.split(' ', 1)
+        command = parts[0].lower()
+        args = parts[1] if len(parts) > 1 else ""
+        
+        logger.info(f"Processing slash command '{command}' from {sender_name}")
+        
+        # Route commands to appropriate handlers
+        if command == "/help":
             return self.get_help_message(sender_name, sender_username)
-        # Also check for standalone "list" command (not part of list_birthdays)
-        if " list " in f" {text.lower()} " and "list_birthdays" not in text.lower() and len(text.strip()) < 50:
-            return self.get_help_message(sender_name, sender_username)
         
-        # Check for birthday commands
-        birthday_commands = ["birthday", "test_birthday", "delete_birthday", "list_birthdays", 
-                           "add_birthday_message", "list_birthday_messages", "delete_birthday_message"]
-        if any(cmd in text.lower() for cmd in birthday_commands):
-            return self.process_birthday_command(text, sender_name, sender_username, sender_id, chat_id)
+        elif command == "/archive":
+            return self.handle_archive_command(args, sender_name)
         
-        # Check if message contains the word "archive" (case insensitive)
-        if "archive" not in text.lower():
-            return None
+        elif command == "/birthday_set":
+            return self.handle_birthday_set_command(args, sender_name, sender_username, sender_id)
         
-        logger.info(f"Processing archive request from {sender_name}")
+        elif command == "/test_birthday":
+            return self.send_test_birthday_message(chat_id)
         
-        urls = self.extract_urls(text)
+        # Admin-only commands
+        elif command in ["/delete_birthday", "/list_birthdays", "/add_birthday_message", 
+                        "/list_birthday_messages", "/delete_birthday_message"]:
+            return self.handle_admin_command(command, args, sender_name, sender_username, sender_id, chat_id)
+        
+        else:
+            return f"Unknown command: {command}. Use /help to see available commands."
+    
+    def handle_archive_command(self, args, sender_name):
+        """Handle /archive command"""
+        if not args.strip():
+            return f"Please provide a URL to archive.\nExample: /archive https://example.com"
+        
+        urls = self.extract_urls(args)
         if not urls:
-            return f"@{sender_name} I found the word 'archive' but no URLs to archive in your message."
+            return f"No valid URLs found in your message. Please provide a URL to archive."
         
         archived_results = []
         for url in urls:
@@ -793,9 +800,146 @@ class SeleniumArchiveBot:
         
         # Use singular/plural based on number of URLs
         if len(urls) == 1:
-            return f"@{sender_name} Here is your archived link:\n\n" + "\n\n".join(archived_results)
+            return f"Here is your archived link:\n\n" + "\n\n".join(archived_results)
         else:
-            return f"@{sender_name} Here are your archived links:\n\n" + "\n\n".join(archived_results)
+            return f"Here are your archived links:\n\n" + "\n\n".join(archived_results)
+    
+    def handle_birthday_set_command(self, args, sender_name, sender_username, sender_id):
+        """Handle /birthday_set command"""
+        if not args.strip():
+            return "Please provide birthday information.\nFormat: /birthday_set YYYY-MM-DD Timezone [username]\nExample: /birthday_set 1990-03-15 America/New_York"
+        
+        # Parse the birthday command using existing logic
+        fake_text = f"birthday set {args}"  # Convert to old format for parsing
+        birthday_data, error = self.parse_birthday_command(fake_text, sender_username, sender_id)
+        
+        if error:
+            return error
+        
+        target_username = birthday_data['username']
+        
+        # Check authorization
+        is_authorized, auth_type = self.is_user_authorized(sender_username, target_username)
+        if not is_authorized:
+            return f"You can only set your own birthday. To set birthday for @{target_username}, ask an admin to do it."
+        
+        # Load existing birthdays
+        birthdays = self.load_birthdays()
+        
+        # Check if user already exists and show update message
+        update_message = ""
+        if target_username in birthdays:
+            existing = birthdays[target_username]
+            existing_age = self.calculate_age(existing['date'])
+            update_message = f"\n\n📝 Updated from:\nOld Birthday: {existing['date']}\nOld Timezone: {existing['timezone']}\nOld Age: {existing_age}"
+        
+        # Save new birthday (always save, whether new or update)
+        birthdays[target_username] = birthday_data
+        self.save_birthdays(birthdays)
+        
+        age = self.calculate_age(birthday_data['date'])
+        
+        if auth_type == "self":
+            return f"✅ Your birthday has been saved!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}"
+        else:
+            return f"✅ Birthday saved for @{target_username}!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}"
+    
+    def handle_admin_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
+        """Handle admin-only commands"""
+        # Check if user is admin
+        special_users = ["racistwaluigi", "kokorozasu"]
+        if sender_username.lower() not in special_users:
+            return "This command is only available to administrators."
+        
+        # Route to appropriate admin command handler
+        if command == "/delete_birthday":
+            return self.handle_delete_birthday_command(args, sender_name)
+        elif command == "/list_birthdays":
+            return self.handle_list_birthdays_command(sender_name)
+        elif command == "/add_birthday_message":
+            return self.handle_add_birthday_message_command(args, sender_name, sender_username)
+        elif command == "/list_birthday_messages":
+            return self.handle_list_birthday_messages_command(sender_name, sender_username)
+        elif command == "/delete_birthday_message":
+            return self.handle_delete_birthday_message_command(args, sender_name, sender_username)
+        
+        return "Unknown admin command."
+    
+    def handle_delete_birthday_command(self, args, sender_name):
+        """Handle /delete_birthday command"""
+        if not args.strip():
+            return "Please specify a username.\nFormat: /delete_birthday username\nExample: /delete_birthday john"
+        
+        username_to_delete = args.strip().replace('@', '').lower()
+        
+        # Load existing birthdays
+        birthdays = self.load_birthdays()
+        
+        # Check if user exists
+        if username_to_delete not in birthdays:
+            return f"User @{username_to_delete} not found in birthday database."
+        
+        # Show existing data before deletion
+        existing = birthdays[username_to_delete]
+        existing_age = self.calculate_age(existing['date'])
+        
+        # Delete the birthday
+        del birthdays[username_to_delete]
+        self.save_birthdays(birthdays)
+        
+        return f"✅ Birthday deleted for @{username_to_delete}!\nDeleted data:\nBirthday: {existing['date']}\nTimezone: {existing['timezone']}\nAge: {existing_age}"
+    
+    def handle_list_birthdays_command(self, sender_name):
+        """Handle /list_birthdays command"""
+        # Load existing birthdays
+        birthdays = self.load_birthdays()
+        
+        if not birthdays:
+            return "No birthdays stored in the database."
+        
+        # Sort birthdays chronologically (by month and day)
+        def get_birthday_sort_key(item):
+            username, data = item
+            birth_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+            # Use month and day for chronological sorting (ignore year)
+            return (birth_date.month, birth_date.day)
+        
+        sorted_birthdays = sorted(birthdays.items(), key=get_birthday_sort_key)
+        
+        # Format birthday list (without @ to avoid pinging users)
+        birthday_list = []
+        for username, data in sorted_birthdays:
+            age = self.calculate_age(data['date'])
+            birth_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+            formatted_date = birth_date.strftime('%B %d, %Y')  # e.g., "March 15, 1990"
+            birthday_list.append(f"{username}: {formatted_date} ({data['timezone']}) - Age: {age}")
+        
+        total_count = len(birthdays)
+        header = f"📋 Birthday Database ({total_count} users):\n\n"
+        
+        return header + "\n".join(birthday_list)
+    
+    def handle_add_birthday_message_command(self, args, sender_name, sender_username):
+        """Handle /add_birthday_message command"""
+        if not args.strip():
+            return "Please provide message details.\nFormats:\n• /add_birthday_message random \"Your message with {username} and {age}\"\n• /add_birthday_message user username \"User-specific message\""
+        
+        # Use existing logic from process_add_birthday_message
+        fake_text = f"add_birthday_message {args}"
+        return self.process_add_birthday_message(fake_text, sender_name, sender_username)
+    
+    def handle_list_birthday_messages_command(self, sender_name, sender_username):
+        """Handle /list_birthday_messages command"""
+        return self.process_list_birthday_messages(sender_name, sender_username)
+    
+    def handle_delete_birthday_message_command(self, args, sender_name, sender_username):
+        """Handle /delete_birthday_message command"""
+        if not args.strip():
+            return "Please specify what to delete.\nFormats:\n• /delete_birthday_message random [number]\n• /delete_birthday_message user [username]"
+        
+        # Use existing logic from process_delete_birthday_message
+        fake_text = f"delete_birthday_message {args}"
+        return self.process_delete_birthday_message(fake_text, sender_name, sender_username)
     
     def send_message(self, chat_id, text, reply_to_message_id=None, disable_web_page_preview=False):
         """Send message via Telegram Bot API"""
@@ -853,8 +997,8 @@ class SeleniumArchiveBot:
                 logger.debug(f"Message {msg_key} already processed, skipping")
                 return
             
-            # Process if bot is mentioned
-            reply_text = self.process_message_for_archives(text, sender_name, sender_username, sender_id, chat_id)
+            # Process slash commands
+            reply_text = self.process_slash_command(text, sender_name, sender_username, sender_id, chat_id)
             if reply_text:
                 # Mark as processed
                 self.processed_messages.add(msg_key)
@@ -922,6 +1066,63 @@ class SeleniumArchiveBot:
                 'bot': self.bot_username
             })
     
+    def set_bot_commands(self):
+        """Set bot commands using Telegram's setMyCommands API"""
+        try:
+            import requests
+            
+            # Basic commands for all users
+            basic_commands = [
+                {"command": "help", "description": "Show available commands"},
+                {"command": "archive", "description": "Archive a URL"},
+                {"command": "birthday_set", "description": "Set your birthday"},
+                {"command": "test_birthday", "description": "Send test birthday message"}
+            ]
+            
+            # Admin commands for special users
+            admin_commands = basic_commands + [
+                {"command": "delete_birthday", "description": "Delete a user's birthday"},
+                {"command": "list_birthdays", "description": "List all stored birthdays"},
+                {"command": "add_birthday_message", "description": "Add custom birthday message"},
+                {"command": "list_birthday_messages", "description": "View all birthday messages"},
+                {"command": "delete_birthday_message", "description": "Delete birthday message"}
+            ]
+            
+            # Set commands for regular users (default)
+            url = f"{self.telegram_api_url}/setMyCommands"
+            data = {'commands': basic_commands}
+            response = requests.post(url, json=data, timeout=30)
+            
+            if response.status_code == 200:
+                logger.info("Basic bot commands set successfully")
+            else:
+                logger.error(f"Failed to set basic commands: {response.text}")
+            
+            # Set commands for admin users
+            special_users = ["racistwaluigi", "kokorozasu"]
+            for username in special_users:
+                try:
+                    # Get user ID for the username (this is a simplified approach)
+                    # In practice, you might need to store user IDs when they first interact
+                    admin_data = {
+                        'commands': admin_commands,
+                        'scope': {'type': 'chat', 'chat_id': f"@{username}"}
+                    }
+                    admin_response = requests.post(url, json=admin_data, timeout=30)
+                    
+                    if admin_response.status_code == 200:
+                        logger.info(f"Admin commands set for @{username}")
+                    else:
+                        logger.warning(f"Could not set admin commands for @{username}: {admin_response.text}")
+                except Exception as e:
+                    logger.warning(f"Error setting admin commands for @{username}: {e}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error setting bot commands: {e}")
+            return False
+    
     def set_webhook(self):
         """Set the webhook URL with Telegram"""
         try:
@@ -976,6 +1177,12 @@ class SeleniumArchiveBot:
         else:
             logger.error("Failed to configure webhook")
             return
+        
+        # Set bot commands
+        if self.set_bot_commands():
+            logger.info("Bot commands configured successfully")
+        else:
+            logger.warning("Failed to configure bot commands")
         
         try:
             # Run Flask app
