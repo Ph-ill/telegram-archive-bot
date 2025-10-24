@@ -766,11 +766,8 @@ class SeleniumArchiveBot:
         elif command == "/birthday_set":
             return self.handle_birthday_set_command(args, sender_name, sender_username, sender_id)
         
-        elif command == "/test_birthday":
-            return self.send_test_birthday_message(chat_id)
-        
         # Admin-only commands
-        elif command in ["/delete_birthday", "/list_birthdays", "/add_birthday_message", 
+        elif command in ["/test_birthday", "/delete_birthday", "/list_birthdays", "/add_birthday_message", 
                         "/list_birthday_messages", "/delete_birthday_message"]:
             return self.handle_admin_command(command, args, sender_name, sender_username, sender_id, chat_id)
         
@@ -852,7 +849,9 @@ class SeleniumArchiveBot:
             return "This command is only available to administrators."
         
         # Route to appropriate admin command handler
-        if command == "/delete_birthday":
+        if command == "/test_birthday":
+            return self.send_test_birthday_message(chat_id)
+        elif command == "/delete_birthday":
             return self.handle_delete_birthday_command(args, sender_name)
         elif command == "/list_birthdays":
             return self.handle_list_birthdays_command(sender_name)
@@ -1075,12 +1074,15 @@ class SeleniumArchiveBot:
             basic_commands = [
                 {"command": "help", "description": "Show available commands"},
                 {"command": "archive", "description": "Archive a URL"},
-                {"command": "birthday_set", "description": "Set your birthday"},
-                {"command": "test_birthday", "description": "Send test birthday message"}
+                {"command": "birthday_set", "description": "Set your birthday"}
             ]
             
             # Admin commands for special users
-            admin_commands = basic_commands + [
+            admin_commands = [
+                {"command": "help", "description": "Show available commands"},
+                {"command": "archive", "description": "Archive a URL"},
+                {"command": "birthday_set", "description": "Set your birthday"},
+                {"command": "test_birthday", "description": "Send test birthday message"},
                 {"command": "delete_birthday", "description": "Delete a user's birthday"},
                 {"command": "list_birthdays", "description": "List all stored birthdays"},
                 {"command": "add_birthday_message", "description": "Add custom birthday message"},
@@ -1088,34 +1090,17 @@ class SeleniumArchiveBot:
                 {"command": "delete_birthday_message", "description": "Delete birthday message"}
             ]
             
-            # Set commands for regular users (default)
+            # Set admin commands globally (all users will see them, but we'll check permissions)
+            # This is more reliable than trying to set user-specific commands
             url = f"{self.telegram_api_url}/setMyCommands"
-            data = {'commands': basic_commands}
+            data = {'commands': admin_commands}
             response = requests.post(url, json=data, timeout=30)
             
             if response.status_code == 200:
-                logger.info("Basic bot commands set successfully")
+                logger.info("Bot commands set successfully (admin commands visible to all)")
             else:
-                logger.error(f"Failed to set basic commands: {response.text}")
-            
-            # Set commands for admin users
-            special_users = ["racistwaluigi", "kokorozasu"]
-            for username in special_users:
-                try:
-                    # Get user ID for the username (this is a simplified approach)
-                    # In practice, you might need to store user IDs when they first interact
-                    admin_data = {
-                        'commands': admin_commands,
-                        'scope': {'type': 'chat', 'chat_id': f"@{username}"}
-                    }
-                    admin_response = requests.post(url, json=admin_data, timeout=30)
-                    
-                    if admin_response.status_code == 200:
-                        logger.info(f"Admin commands set for @{username}")
-                    else:
-                        logger.warning(f"Could not set admin commands for @{username}: {admin_response.text}")
-                except Exception as e:
-                    logger.warning(f"Error setting admin commands for @{username}: {e}")
+                logger.error(f"Failed to set commands: {response.text}")
+                return False
             
             return True
             
