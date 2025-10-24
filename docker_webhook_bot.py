@@ -490,7 +490,7 @@ class SeleniumArchiveBot:
         
         messages = self.load_birthday_messages()
         
-        result = f"@{sender_name} 📝 Birthday Messages:\n\n"
+        result = f"📝 Birthday Messages:\n\n<blockquote expandable>"
         
         # Random messages
         random_messages = messages.get("random_messages", [])
@@ -510,6 +510,8 @@ class SeleniumArchiveBot:
                 result += f"@{username}: {msg}\n"
         else:
             result += "👤 User-Specific Messages: None"
+        
+        result += "</blockquote>"
         
         return result
     
@@ -950,9 +952,9 @@ class SeleniumArchiveBot:
             birthday_list.append(f"{username}: {formatted_date} ({data['timezone']}) - Age: {age}")
         
         total_count = len(birthdays)
-        header = f"📋 Birthday Database ({total_count} users):\n\n"
+        header = f"📋 Birthday Database ({total_count} users):\n\n<blockquote expandable>"
         
-        return header + "\n".join(birthday_list)
+        return header + "\n".join(birthday_list) + "</blockquote>"
     
     def handle_add_birthday_message_command(self, args, sender_name, sender_username):
         """Handle /add_birthday_message command"""
