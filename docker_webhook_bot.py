@@ -948,7 +948,7 @@ class SeleniumArchiveBot:
         for username, data in sorted_birthdays:
             age = self.calculate_age(data['date'])
             birth_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
-            formatted_date = birth_date.strftime('%B %d, %Y')  # e.g., "March 15, 1990"
+            formatted_date = birth_date.strftime('%b %d, %Y')  # e.g., "Mar 15, 1990"
             birthday_list.append(f"{username}: {formatted_date} ({data['timezone']}) - Age: {age}")
         
         total_count = len(birthdays)
