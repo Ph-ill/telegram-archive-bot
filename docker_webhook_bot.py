@@ -754,6 +754,17 @@ class SeleniumArchiveBot:
         command = parts[0].lower()
         args = parts[1] if len(parts) > 1 else ""
         
+        # Check if command is directed at this bot or no specific bot
+        if '@' in command:
+            # Command is directed at a specific bot (e.g., /help@Angel_Dimi_Bot)
+            cmd_parts = command.split('@', 1)
+            command = cmd_parts[0]  # Extract the actual command
+            target_bot = cmd_parts[1]  # Extract the target bot username
+            
+            # Only respond if the command is directed at this bot
+            if target_bot.lower() != self.bot_username.lower():
+                return None  # Ignore commands for other bots
+        
         logger.info(f"Processing slash command '{command}' from {sender_name}")
         
         # Route commands to appropriate handlers
