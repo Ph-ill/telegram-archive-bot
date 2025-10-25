@@ -149,6 +149,56 @@ class QuizStateManager:
                 logger.error(f"Failed to mark question {question_idx} as answered in chat {chat_id}: {e}")
                 return False
     
+    def check_user_attempted_question(self, chat_id: int, question_idx: int, user_id: int) -> bool:
+        """Check if user has already attempted this question"""
+        with self.lock:
+            try:
+                data = self._read_data()
+                chat_key = str(chat_id)
+                
+                if chat_key not in data:
+                    return False
+                
+                quiz_state = data[chat_key]
+                if 'questions' not in quiz_state or question_idx >= len(quiz_state['questions']):
+                    return False
+                
+                question = quiz_state['questions'][question_idx]
+                attempted_by = question.get('attempted_by', [])
+                
+                return user_id in attempted_by
+            except Exception as e:
+                logger.error(f"Failed to check user attempt for question {question_idx} in chat {chat_id}: {e}")
+                return False
+    
+    def mark_user_attempted_question(self, chat_id: int, question_idx: int, user_id: int) -> bool:
+        """Mark that a user has attempted this question"""
+        with self.lock:
+            try:
+                data = self._read_data()
+                chat_key = str(chat_id)
+                
+                if chat_key not in data:
+                    return False
+                
+                quiz_state = data[chat_key]
+                if 'questions' not in quiz_state or question_idx >= len(quiz_state['questions']):
+                    return False
+                
+                question = quiz_state['questions'][question_idx]
+                if 'attempted_by' not in question:
+                    question['attempted_by'] = []
+                
+                if user_id not in question['attempted_by']:
+                    question['attempted_by'].append(user_id)
+                    self._write_data(data)
+                    logger.debug(f"User {user_id} marked as attempted question {question_idx} in chat {chat_id}")
+                
+                return True
+            except Exception as e:
+                logger.error(f"Failed to mark user attempt for question {question_idx} in chat {chat_id}: {e}")
+                return False
+    
     def clear_quiz_state(self, chat_id: int) -> None:
         """Clear quiz state for specified chat"""
         with self.lock:
@@ -281,7 +331,8 @@ class QuizStateManager:
             'options': question_data.get('options', []),
             'correct_answer': question_data.get('correct_answer', ''),
             'answered': False,
-            'answered_by': None
+            'answered_by': None,
+            'attempted_by': []  # Track users who have attempted this question
         }
     
     def get_quiz_status(self, chat_id: int) -> dict:

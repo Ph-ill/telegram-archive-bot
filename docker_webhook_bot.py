@@ -2037,6 +2037,8 @@ class SeleniumArchiveBot:
                 error_message = quiz_ui.format_error_message(result['error_type'], result['error'])
                 if result['error_type'] == 'already_answered':
                     self.answer_callback_query(callback_query['id'], "⏰ Too late! Someone else answered first.")
+                elif result['error_type'] == 'already_attempted':
+                    self.answer_callback_query(callback_query['id'], "🚫 You already tried this question!")
                 else:
                     self.answer_callback_query(callback_query['id'], "❌ Error processing answer.")
                     

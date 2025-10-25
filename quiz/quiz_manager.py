@@ -159,13 +159,16 @@ class QuizManager:
             
             question = questions[question_idx]
             
-            # Check if question is already answered (atomic operation)
-            if not self.state_manager.mark_question_answered(chat_id, question_idx, answer):
+            # Check if user has already attempted this question
+            if self.state_manager.check_user_attempted_question(chat_id, user_id, question_idx):
                 return {
                     'success': False,
-                    'error': 'Too late! Someone else already answered this question.',
-                    'error_type': 'already_answered'
+                    'error': 'You have already attempted this question.',
+                    'error_type': 'already_attempted'
                 }
+            
+            # Mark user as having attempted this question
+            self.state_manager.mark_user_attempted_question(chat_id, question_idx, user_id)
             
             # Check if answer is correct
             correct_answer = question.get('correct_answer', '')
@@ -180,28 +183,31 @@ class QuizManager:
                 'question_idx': question_idx
             }
             
-            # Award points if correct
             if is_correct:
+                # Award points and mark question as answered
                 self.state_manager.update_scores(chat_id, user_id, username, 1)
+                self.state_manager.mark_question_answered(chat_id, question_idx, answer)
                 result['points_awarded'] = 1
                 logger.info(f"User {username} ({user_id}) answered question {question_idx} correctly in chat {chat_id}")
+                
+                # Check if quiz is complete
+                current_question = quiz_state.get('current_question', 0)
+                if question_idx == current_question:
+                    # This was the current question, advance to next
+                    if self.state_manager.advance_to_next_question(chat_id):
+                        # More questions available
+                        next_question = self.get_current_question(chat_id)
+                        result['next_question'] = next_question
+                        result['quiz_complete'] = False
+                    else:
+                        # Quiz is complete
+                        result['quiz_complete'] = True
+                        result['final_leaderboard'] = self.get_leaderboard(chat_id)
             else:
+                # Incorrect answer - don't advance question
                 result['points_awarded'] = 0
+                result['quiz_complete'] = False
                 logger.info(f"User {username} ({user_id}) answered question {question_idx} incorrectly in chat {chat_id}")
-            
-            # Check if quiz is complete
-            current_question = quiz_state.get('current_question', 0)
-            if question_idx == current_question:
-                # This was the current question, advance to next
-                if self.state_manager.advance_to_next_question(chat_id):
-                    # More questions available
-                    next_question = self.get_current_question(chat_id)
-                    result['next_question'] = next_question
-                    result['quiz_complete'] = False
-                else:
-                    # Quiz is complete
-                    result['quiz_complete'] = True
-                    result['final_leaderboard'] = self.get_leaderboard(chat_id)
             
             return result
             

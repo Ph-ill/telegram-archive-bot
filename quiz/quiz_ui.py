@@ -404,6 +404,7 @@ class QuizUI:
             'api_error': '🔧',
             'system_error': '💥',
             'already_answered': '⏰',
+            'already_attempted': '🚫',
             'invalid_question': '❓'
         }
         
