@@ -1978,10 +1978,9 @@ class SeleniumArchiveBot:
         # Remaining parts form the subject
         subject = " ".join(parts)
         
-        # Send progress message first
+        # Create quiz UI instance
         from quiz.quiz_ui import QuizUI
         quiz_ui = QuizUI(self)
-        progress_msg_id = quiz_ui.send_quiz_progress(chat_id, subject, num_questions, difficulty)
         
         # Create the quiz
         result = self.quiz_manager.create_quiz(chat_id, subject, num_questions, difficulty)
@@ -2272,34 +2271,30 @@ class SeleniumArchiveBot:
             result = self.quiz_manager.process_answer(chat_id, user_id, username, question_idx, selected_answer)
             
             if result['success']:
-                # Update the question message with result
-                quiz_ui.update_question_result(chat_id, message_id, result)
-                
+                # Prepare result message for next question or final results
                 if result['is_correct']:
                     callback_message = f"✅ Correct! +{result['points_awarded']} point"
+                    result_text = f"✅ {result['username']} got it right!"
                 else:
                     callback_message = f"❌ Wrong answer. Correct: {result['correct_answer']}"
+                    result_text = f"❌ {result['username']} was wrong. Answer: {result['correct_answer']}"
                 
                 self.answer_callback_query(callback_query['id'], callback_message)
                 
                 # Check if quiz is complete or send next question
                 if result.get('quiz_complete'):
-                    # Send final leaderboard
+                    # Send final results with last question result
                     final_leaderboard = result.get('final_leaderboard', {})
                     if final_leaderboard.get('success'):
-                        quiz_ui.send_leaderboard(
-                            chat_id, 
-                            final_leaderboard['leaderboard'], 
-                            final_leaderboard['quiz_info'], 
-                            is_final=True
-                        )
+                        quiz_ui.send_final_results(chat_id, final_leaderboard['leaderboard'], 
+                                                 final_leaderboard['quiz_info'], result_text)
                 elif result.get('next_question'):
-                    # Send next question
+                    # Send next question with previous result
                     next_question = result['next_question']
                     quiz_status = self.quiz_manager.get_quiz_status(chat_id)
                     current_q_num = quiz_status.get('answered_questions', 0) + 1
                     total_questions = quiz_status.get('total_questions', 0)
-                    quiz_ui.send_question(chat_id, next_question, current_q_num, total_questions)
+                    quiz_ui.send_question(chat_id, next_question, current_q_num, total_questions, result_text)
             else:
                 # Answer processing failed
                 error_message = quiz_ui.format_error_message(result['error_type'], result['error'])

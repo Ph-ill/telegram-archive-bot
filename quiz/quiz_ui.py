@@ -16,7 +16,8 @@ class QuizUI:
         self.bot_instance = bot_instance
         logger.info("QuizUI initialized")
     
-    def send_question(self, chat_id: int, question_data: Dict[str, Any], question_num: int, total_questions: int) -> Optional[int]:
+    def send_question(self, chat_id: int, question_data: Dict[str, Any], question_num: int, 
+                     total_questions: int, previous_result: str = None) -> Optional[int]:
         """
         Send a quiz question with inline keyboard buttons
         
@@ -38,8 +39,8 @@ class QuizUI:
                 logger.error(f"Invalid question data for chat {chat_id}")
                 return None
             
-            # Format the question message with options
-            message_text = self._format_question_message(question_text, question_num, total_questions, options)
+            # Format the question message with options and previous result
+            message_text = self._format_question_message(question_text, question_num, total_questions, options, previous_result)
             
             # Create inline keyboard
             keyboard = self._create_question_keyboard(chat_id, question_idx, options)
@@ -241,7 +242,8 @@ class QuizUI:
             logger.error(f"Error sending quiz progress to chat {chat_id}: {e}")
             return None
     
-    def _format_question_message(self, question_text: str, question_num: int, total_questions: int, options: List[str] = None) -> str:
+    def _format_question_message(self, question_text: str, question_num: int, total_questions: int, 
+                               options: List[str] = None, previous_result: str = None) -> str:
         """
         Format a question message with proper styling and answer options
         
@@ -250,21 +252,24 @@ class QuizUI:
             question_num: Current question number (1-based)
             total_questions: Total number of questions
             options: List of answer options to display
+            previous_result: Result from previous question (if any)
             
         Returns:
             Formatted message text
         """
-        message = f"❓ **Question {question_num}/{total_questions}**\n\n"
-        message += f"> {question_text}\n\n"
+        message = ""
+        
+        # Add previous result if provided
+        if previous_result:
+            message += f"{previous_result}\n\n"
+        
+        message += f"❓ **Question {question_num}/{total_questions}**\n"
+        message += f"{question_text}\n\n"
         
         if options:
-            message += "**Answer Options:**\n"
             for i, option in enumerate(options):
                 letter = chr(65 + i)  # A, B, C, D
                 message += f"**{letter})** {option}\n"
-            message += "\n👆 Choose your answer using the buttons below!"
-        else:
-            message += "👆 Choose your answer above!"
         
         return message
     
@@ -371,7 +376,7 @@ class QuizUI:
             letter = chr(65 + i)  # A, B, C, D
             callback_data = f"quiz_{chat_id}_{question_idx}_{i}"
             row.append({
-                "text": f"🔘 {letter}",
+                "text": letter,
                 "callback_data": callback_data
             })
             
@@ -380,7 +385,7 @@ class QuizUI:
                 letter = chr(65 + i + 1)  # B, C, D
                 callback_data = f"quiz_{chat_id}_{question_idx}_{i + 1}"
                 row.append({
-                    "text": f"🔘 {letter}",
+                    "text": letter,
                     "callback_data": callback_data
                 })
             
@@ -454,3 +459,61 @@ class QuizUI:
             Formatted success message
         """
         return f"✅ {message}"
+    
+    def send_final_results(self, chat_id: int, leaderboard_data: List[Dict[str, Any]], 
+                          quiz_info: Dict[str, Any], last_result: str) -> Optional[int]:
+        """
+        Send final quiz results with last question result
+        
+        Args:
+            chat_id: Telegram chat ID
+            leaderboard_data: Final leaderboard data
+            quiz_info: Quiz information
+            last_result: Result from the last question
+            
+        Returns:
+            Message ID of sent message, or None if failed
+        """
+        try:
+            message = f"{last_result}\n\n"
+            message += "🏁 **Quiz Complete!**\n\n"
+            
+            if leaderboard_data:
+                winner = leaderboard_data[0]
+                if len(leaderboard_data) > 1 and winner['points'] > 0:
+                    message += f"🏆 **Winner:** {winner['username']} ({winner['points']} points)\n\n"
+                
+                # Show top 3 only for conciseness
+                for i, player in enumerate(leaderboard_data[:3]):
+                    rank = i + 1
+                    username = player.get('username', 'Unknown')
+                    points = player.get('points', 0)
+                    
+                    if rank == 1:
+                        message += f"🥇 {username} - {points} points\n"
+                    elif rank == 2:
+                        message += f"🥈 {username} - {points} points\n"
+                    elif rank == 3:
+                        message += f"🥉 {username} - {points} points\n"
+                
+                if len(leaderboard_data) > 3:
+                    message += f"... and {len(leaderboard_data) - 3} more players"
+            else:
+                message += "No participants scored points."
+            
+            response = self.bot_instance.send_message(
+                chat_id=chat_id,
+                text=message,
+                parse_mode='Markdown'
+            )
+            
+            if response and 'message_id' in response:
+                logger.debug(f"Final results sent to chat {chat_id}")
+                return response['message_id']
+            else:
+                logger.warning(f"Failed to send final results to chat {chat_id}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error sending final results to chat {chat_id}: {e}")
+            return None
