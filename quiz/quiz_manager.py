@@ -200,9 +200,14 @@ class QuizManager:
                         result['next_question'] = next_question
                         result['quiz_complete'] = False
                     else:
-                        # Quiz is complete
+                        # Quiz is complete - record win and get final results
+                        final_results = self.stop_quiz(chat_id, record_win=True)
                         result['quiz_complete'] = True
-                        result['final_leaderboard'] = self.get_leaderboard(chat_id)
+                        result['final_leaderboard'] = {
+                            'success': final_results['success'],
+                            'leaderboard': final_results.get('final_leaderboard', []),
+                            'quiz_info': final_results.get('quiz_info', {})
+                        }
             else:
                 # Incorrect answer - don't advance question
                 result['points_awarded'] = 0
@@ -221,7 +226,7 @@ class QuizManager:
     
     def get_leaderboard(self, chat_id: int) -> Dict[str, Any]:
         """
-        Get current leaderboard for active quiz
+        Get leaderboard - current quiz if active, otherwise persistent leaderboard
         
         Args:
             chat_id: Telegram chat ID
@@ -230,28 +235,32 @@ class QuizManager:
             Dictionary with leaderboard data or error information
         """
         try:
-            if not self.is_quiz_active(chat_id):
+            if self.is_quiz_active(chat_id):
+                # Get current quiz leaderboard
+                leaderboard_data = self.state_manager.get_leaderboard_data(chat_id)
+                quiz_status = self.state_manager.get_quiz_status(chat_id)
+                
                 return {
-                    'success': False,
-                    'error': 'No active quiz in this chat.',
-                    'error_type': 'no_quiz'
+                    'success': True,
+                    'type': 'current_quiz',
+                    'leaderboard': leaderboard_data,
+                    'quiz_info': {
+                        'subject': quiz_status.get('subject', 'Unknown'),
+                        'difficulty': quiz_status.get('difficulty', 'medium'),
+                        'total_questions': quiz_status.get('total_questions', 0),
+                        'answered_questions': quiz_status.get('answered_questions', 0),
+                        'participants': quiz_status.get('participants', 0)
+                    }
                 }
-            
-            # Get leaderboard data
-            leaderboard_data = self.state_manager.get_leaderboard_data(chat_id)
-            quiz_status = self.state_manager.get_quiz_status(chat_id)
-            
-            return {
-                'success': True,
-                'leaderboard': leaderboard_data,
-                'quiz_info': {
-                    'subject': quiz_status.get('subject', 'Unknown'),
-                    'difficulty': quiz_status.get('difficulty', 'medium'),
-                    'total_questions': quiz_status.get('total_questions', 0),
-                    'answered_questions': quiz_status.get('answered_questions', 0),
-                    'participants': quiz_status.get('participants', 0)
+            else:
+                # Get persistent leaderboard
+                persistent_leaderboard = self.state_manager.get_persistent_leaderboard()
+                
+                return {
+                    'success': True,
+                    'type': 'persistent',
+                    'leaderboard': persistent_leaderboard
                 }
-            }
             
         except Exception as e:
             logger.error(f"Error getting leaderboard for chat {chat_id}: {e}")
@@ -261,12 +270,13 @@ class QuizManager:
                 'error_type': 'system_error'
             }
     
-    def stop_quiz(self, chat_id: int) -> Dict[str, Any]:
+    def stop_quiz(self, chat_id: int, record_win: bool = True) -> Dict[str, Any]:
         """
         Stop the active quiz in the specified chat
         
         Args:
             chat_id: Telegram chat ID
+            record_win: Whether to record the win in persistent leaderboard
             
         Returns:
             Dictionary with final results or error information
@@ -279,8 +289,29 @@ class QuizManager:
                     'error_type': 'no_quiz'
                 }
             
-            # Get final leaderboard before clearing
+            # Get final leaderboard and quiz info before clearing
             final_leaderboard = self.get_leaderboard(chat_id)
+            quiz_state = self.state_manager.load_quiz_state(chat_id)
+            
+            # Record win if appropriate
+            if (record_win and final_leaderboard['success'] and 
+                final_leaderboard.get('leaderboard') and
+                self.state_manager.check_quiz_has_multiple_participants(chat_id)):
+                
+                # Get the winner (highest score)
+                winner = final_leaderboard['leaderboard'][0]
+                quiz_info = final_leaderboard.get('quiz_info', {})
+                
+                if winner['points'] > 0:  # Only record if winner actually scored
+                    self.state_manager.record_quiz_win(
+                        winner_user_id=winner['user_id'],
+                        winner_username=winner['username'],
+                        quiz_subject=quiz_info.get('subject', 'Unknown'),
+                        total_participants=len(final_leaderboard['leaderboard']),
+                        winner_score=winner['points'],
+                        total_questions=quiz_info.get('total_questions', 0)
+                    )
+                    logger.info(f"Recorded quiz win for {winner['username']} in chat {chat_id}")
             
             # Clear quiz state
             self.state_manager.clear_quiz_state(chat_id)

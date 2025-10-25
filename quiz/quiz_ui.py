@@ -110,7 +110,8 @@ class QuizUI:
             return False
     
     def send_leaderboard(self, chat_id: int, leaderboard_data: List[Dict[str, Any]], 
-                        quiz_info: Dict[str, Any], is_final: bool = False) -> Optional[int]:
+                        quiz_info: Dict[str, Any] = None, is_final: bool = False, 
+                        leaderboard_type: str = 'current_quiz') -> Optional[int]:
         """
         Send formatted leaderboard message
         
@@ -124,7 +125,8 @@ class QuizUI:
             Message ID of sent message, or None if failed
         """
         try:
-            message_text = self._format_leaderboard_message(leaderboard_data, quiz_info, is_final)
+            is_persistent = (leaderboard_type == 'persistent')
+            message_text = self._format_leaderboard_message(leaderboard_data, quiz_info, is_final, is_persistent)
             
             response = self.bot_instance.send_message(
                 chat_id=chat_id,
@@ -267,7 +269,7 @@ class QuizUI:
         return message
     
     def _format_leaderboard_message(self, leaderboard_data: List[Dict[str, Any]], 
-                                  quiz_info: Dict[str, Any], is_final: bool = False) -> str:
+                                  quiz_info: Dict[str, Any], is_final: bool = False, is_persistent: bool = False) -> str:
         """
         Format leaderboard message with proper styling
         
@@ -275,28 +277,40 @@ class QuizUI:
             leaderboard_data: List of user scores
             quiz_info: Quiz information
             is_final: Whether this is the final leaderboard
+            is_persistent: Whether this is the persistent all-time leaderboard
             
         Returns:
             Formatted leaderboard message
         """
-        title = "🏆 **Final Results**" if is_final else "📊 **Current Leaderboard**"
+        if is_persistent:
+            title = "🏆 **All-Time Quiz Champions**"
+        elif is_final:
+            title = "🏆 **Final Results**"
+        else:
+            title = "📊 **Current Leaderboard**"
         
         message = f"{title}\n\n"
         
-        # Add quiz info
-        subject = quiz_info.get('subject', 'Unknown')
-        difficulty = quiz_info.get('difficulty', 'medium')
-        total_questions = quiz_info.get('total_questions', 0)
-        answered_questions = quiz_info.get('answered_questions', 0)
-        
-        message += f"**Quiz:** {subject} ({difficulty.title()})\n"
-        if not is_final:
-            message += f"**Progress:** {answered_questions}/{total_questions} questions\n"
-        message += "\n"
+        if is_persistent:
+            message += "**Top quiz winners across all games**\n\n"
+        else:
+            # Add quiz info for current/final quiz
+            subject = quiz_info.get('subject', 'Unknown')
+            difficulty = quiz_info.get('difficulty', 'medium')
+            total_questions = quiz_info.get('total_questions', 0)
+            answered_questions = quiz_info.get('answered_questions', 0)
+            
+            message += f"**Quiz:** {subject} ({difficulty.title()})\n"
+            if not is_final:
+                message += f"**Progress:** {answered_questions}/{total_questions} questions\n"
+            message += "\n"
         
         # Add leaderboard
         if not leaderboard_data:
-            message += "No participants yet! 🤷‍♂️"
+            if is_persistent:
+                message += "No quiz winners yet! Be the first to win a quiz! 🏆"
+            else:
+                message += "No participants yet! 🤷‍♂️"
         else:
             # Medals for top 3
             medals = ["🥇", "🥈", "🥉"]
@@ -304,16 +318,34 @@ class QuizUI:
             for i, player in enumerate(leaderboard_data):
                 rank = i + 1
                 username = player.get('username', 'Unknown')
-                points = player.get('points', 0)
                 
-                if rank <= 3 and len(leaderboard_data) > 1:
-                    medal = medals[rank - 1]
-                    message += f"{medal} **{rank}.** {username} - {points} points\n"
+                if is_persistent:
+                    # Show quiz wins and win rate for persistent leaderboard
+                    quiz_wins = player.get('quiz_wins', 0)
+                    win_rate = player.get('win_rate', 0)
+                    total_points = player.get('total_points', 0)
+                    
+                    if rank <= 3 and len(leaderboard_data) > 1:
+                        medal = medals[rank - 1]
+                        message += f"{medal} **{rank}.** {username}\n"
+                    else:
+                        message += f"**{rank}.** {username}\n"
+                    
+                    message += f"    🏆 {quiz_wins} wins • 📊 {win_rate}% win rate • ⭐ {total_points} total points\n"
                 else:
-                    message += f"**{rank}.** {username} - {points} points\n"
+                    # Show current quiz points
+                    points = player.get('points', 0)
+                    
+                    if rank <= 3 and len(leaderboard_data) > 1:
+                        medal = medals[rank - 1]
+                        message += f"{medal} **{rank}.** {username} - {points} points\n"
+                    else:
+                        message += f"**{rank}.** {username} - {points} points\n"
         
         if is_final:
             message += "\n🎉 Thanks for playing!"
+        elif is_persistent:
+            message += "\n💡 Win quizzes to climb the leaderboard!"
         
         return message
     

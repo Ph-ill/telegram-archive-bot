@@ -20,14 +20,22 @@ class QuizStateManager:
         self.data_file_path = data_file_path
         self.lock = threading.Lock()
         
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(data_file_path), exist_ok=True)
+        # Set up persistent leaderboard file
+        data_dir = os.path.dirname(data_file_path)
+        self.leaderboard_file_path = os.path.join(data_dir, 'quiz_leaderboard.json')
         
-        # Initialize file if it doesn't exist
+        # Ensure directory exists
+        os.makedirs(data_dir, exist_ok=True)
+        
+        # Initialize files if they don't exist
         if not os.path.exists(data_file_path):
             self._write_data({})
         
+        if not os.path.exists(self.leaderboard_file_path):
+            self._write_leaderboard_data({})
+        
         logger.info(f"QuizStateManager initialized with data file: {data_file_path}")
+        logger.info(f"Persistent leaderboard file: {self.leaderboard_file_path}")
     
     def _read_data(self) -> Dict[str, Any]:
         """Read all data from JSON file with error handling"""
@@ -209,7 +217,7 @@ class QuizStateManager:
                 if chat_key in data:
                     del data[chat_key]
                     self._write_data(data)
-                    logger.debug(f"Quiz state cleared for chat {chat_id}")
+                    logger.debug(f"Quiz state ct[str, leared for chat {chat_id}")
                 else:
                     logger.debug(f"No quiz state to clear for chat {chat_id}")
             except Exception as e:
@@ -446,3 +454,123 @@ class QuizStateManager:
                 question['answered_by'] = None
         
         return migrated_state
+    
+    def _read_leaderboard_data(self) -> Dict[str, Any]:
+        """Read persistent leaderboard data from JSON file"""
+        try:
+            with open(self.leaderboard_file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data if isinstance(data, dict) else {}
+        except (FileNotFoundError, json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Error reading leaderboard file: {e}. Returning empty data.")
+            return {}
+    
+    def _write_leaderboard_data(self, data: Dict[str, Any]) -> None:
+        """Write persistent leaderboard data to JSON file atomically"""
+        try:
+            # Write to temporary file first for atomic operation
+            temp_file = f"{self.leaderboard_file_path}.tmp"
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            
+            # Atomic rename
+            os.rename(temp_file, self.leaderboard_file_path)
+        except (IOError, OSError) as e:
+            logger.error(f"Error writing leaderboard file: {e}")
+            # Clean up temp file if it exists
+            if os.path.exists(f"{self.leaderboard_file_path}.tmp"):
+                try:
+                    os.remove(f"{self.leaderboard_file_path}.tmp")
+                except OSError:
+                    pass
+            raise
+    
+    def record_quiz_win(self, winner_user_id: int, winner_username: str, quiz_info: Dict[str, Any], participant_count: int) -> None:
+        """Record a quiz win in the persistent leaderboard (only if multiple participants)"""
+        if participant_count < 2:
+            logger.debug(f"Not recording quiz win - only {participant_count} participant(s)")
+            return
+        
+        with self.lock:
+            try:
+                data = self._read_leaderboard_data()
+                user_key = str(winner_user_id)
+                
+                if user_key not in data:
+                    data[user_key] = {
+                        'username': winner_username,
+                        'wins': 0,
+                        'total_points': 0,
+                        'quizzes_participated': 0,
+                        'last_win_date': None
+                    }
+                
+                # Update win statistics
+                data[user_key]['wins'] += 1
+                data[user_key]['username'] = winner_username  # Update username in case it changed
+                data[user_key]['total_points'] += quiz_info.get('winner_points', 0)
+                data[user_key]['last_win_date'] = datetime.now().isoformat()
+                
+                self._write_leaderboard_data(data)
+                logger.info(f"Recorded quiz win for {winner_username} ({winner_user_id})")
+            except Exception as e:
+                logger.error(f"Failed to record quiz win: {e}")
+                raise
+    
+    def update_participation_stats(self, participants: Dict[str, Dict[str, Any]]) -> None:
+        """Update participation statistics for all quiz participants"""
+        if len(participants) < 2:
+            return  # Don't update stats for single-player quizzes
+        
+        with self.lock:
+            try:
+                data = self._read_leaderboard_data()
+                
+                for user_id_str, participant_data in participants.items():
+                    user_key = str(user_id_str)
+                    username = participant_data.get('username', f'user_{user_id_str}')
+                    
+                    if user_key not in data:
+                        data[user_key] = {
+                            'username': username,
+                            'wins': 0,
+                            'total_points': 0,
+                            'quizzes_participated': 0,
+                            'last_win_date': None
+                        }
+                    
+                    # Update participation count and username
+                    data[user_key]['quizzes_participated'] += 1
+                    data[user_key]['username'] = username
+                
+                self._write_leaderboard_data(data)
+                logger.debug(f"Updated participation stats for {len(participants)} users")
+            except Exception as e:
+                logger.error(f"Failed to update participation stats: {e}")
+    
+    def get_persistent_leaderboard(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get persistent leaderboard data sorted by wins"""
+        try:
+            data = self._read_leaderboard_data()
+            
+            # Convert to list and sort by wins (descending), then by total_points
+            leaderboard = []
+            for user_id, stats in data.items():
+                if stats.get('wins', 0) > 0:  # Only include users with at least one win
+                    leaderboard.append({
+                        'user_id': int(user_id),
+                        'username': stats['username'],
+                        'wins': stats['wins'],
+                        'total_points': stats.get('total_points', 0),
+                        'quizzes_participated': stats.get('quizzes_participated', 0),
+                        'last_win_date': stats.get('last_win_date'),
+                        'win_rate': round((stats['wins'] / max(stats.get('quizzes_participated', 1), 1)) * 100, 1)
+                    })
+            
+            # Sort by wins (descending), then by total_points (descending)
+            leaderboard.sort(key=lambda x: (x['wins'], x['total_points']), reverse=True)
+            
+            return leaderboard[:limit]
+        except Exception as e:
+            logger.error(f"Error getting persistent leaderboard: {e}")
+            return []

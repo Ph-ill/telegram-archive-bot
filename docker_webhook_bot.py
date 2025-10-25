@@ -1748,7 +1748,15 @@ class SeleniumArchiveBot:
         if result['success']:
             from quiz.quiz_ui import QuizUI
             quiz_ui = QuizUI(self)
-            quiz_ui.send_leaderboard(chat_id, result['leaderboard'], result['quiz_info'], is_final=False)
+            leaderboard_type = result.get('type', 'current_quiz')
+            quiz_info = result.get('quiz_info', {})
+            quiz_ui.send_leaderboard(
+                chat_id, 
+                result['leaderboard'], 
+                quiz_info, 
+                is_final=False,
+                leaderboard_type=leaderboard_type
+            )
             return None  # Don't send additional text response
         else:
             from quiz.quiz_ui import QuizUI
