@@ -746,7 +746,8 @@ class SeleniumArchiveBot:
         help_text += f"• /xkcd_random{bot_mention} - Get a random XKCD comic\n"
         help_text += f"• /xkcd_number{bot_mention} &lt;number&gt; - Get a specific XKCD comic\n"
         help_text += f"  Example: /xkcd_number{bot_mention} 353\n"
-        help_text += f"• /iss{bot_mention} - Get current location and crew of the International Space Station\n\n"
+        help_text += f"• /iss{bot_mention} - Get current location and crew of the International Space Station\n"
+        help_text += f"• /mensfashion{bot_mention} - Get a random men's fashion image from Reddit\n\n"
         
         # Special user commands
         if is_special_user:
@@ -982,6 +983,9 @@ class SeleniumArchiveBot:
         elif command == "/iss":
             return self.handle_iss_command()
         
+        elif command == "/mensfashion":
+            return self.handle_mensfashion_command(chat_id)
+        
         # Quiz commands
         elif command in ["/quiz_new", "/quiz_leaderboard", "/quiz_stop", "/quiz_help"]:
             return self.handle_quiz_command(command, args, sender_name, sender_username, sender_id, chat_id)
@@ -1102,6 +1106,73 @@ class SeleniumArchiveBot:
         except Exception as e:
             logger.error(f"Error sending Layla image: {e}")
             return f"❌ Error sending Layla image: {str(e)}"
+    
+    def handle_mensfashion_command(self, chat_id):
+        """Handle /mensfashion command - send random image from r/malefashionadvice"""
+        try:
+            import requests
+            import json
+            import random
+            
+            # Get posts from r/malefashionadvice
+            headers = {
+                'User-Agent': 'TelegramBot/1.0 (by /u/YourUsername)'
+            }
+            
+            # Try multiple subreddits for better variety
+            subreddits = ['malefashionadvice', 'malefashion', 'streetwear']
+            selected_subreddit = random.choice(subreddits)
+            
+            url = f"https://www.reddit.com/r/{selected_subreddit}/hot.json?limit=50"
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code != 200:
+                return "❌ Failed to fetch fashion posts. Please try again later."
+            
+            data = response.json()
+            posts = data.get('data', {}).get('children', [])
+            
+            # Filter for image posts
+            image_posts = []
+            for post in posts:
+                post_data = post.get('data', {})
+                url = post_data.get('url', '')
+                
+                # Check if it's an image URL
+                if (url.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')) or 
+                    'i.redd.it' in url or 'i.imgur.com' in url):
+                    image_posts.append({
+                        'url': url,
+                        'title': post_data.get('title', ''),
+                        'subreddit': post_data.get('subreddit', '')
+                    })
+            
+            if not image_posts:
+                return "❌ No fashion images found. Please try again later."
+            
+            # Select random image
+            selected_post = random.choice(image_posts)
+            image_url = selected_post['url']
+            
+            # Send the image
+            telegram_url = f"{self.telegram_api_url}/sendPhoto"
+            data = {
+                'chat_id': chat_id,
+                'photo': image_url
+            }
+            
+            response = requests.post(telegram_url, json=data, timeout=30)
+            
+            if response.status_code == 200:
+                logger.info(f"Men's fashion image sent to chat {chat_id}")
+                return None  # Don't send text response when image is sent successfully
+            else:
+                logger.error(f"Failed to send fashion image: {response.text}")
+                return "❌ Failed to send fashion image."
+                
+        except Exception as e:
+            logger.error(f"Error in mensfashion command: {e}")
+            return f"❌ Error fetching fashion image: {str(e)}"
     
     def handle_bored_command(self):
         """Handle /bored command - get a random activity"""
