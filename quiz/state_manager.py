@@ -360,12 +360,7 @@ class QuizStateManager:
             
         except Exception as e:
             logger.error(f"Error checking quiz participants for chat {chat_id}: {e}")
-            return Falseleared for chat {chat_id}")
-                else:
-                    logger.debug(f"No quiz state to clear for chat {chat_id}")
-            except Exception as e:
-                logger.error(f"Failed to clear quiz state for chat {chat_id}: {e}")
-                raise
+            return False
     
     def validate_quiz_state(self, quiz_state: dict) -> bool:
         """Validate quiz state structure and data integrity"""
