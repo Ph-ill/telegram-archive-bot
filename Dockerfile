@@ -27,6 +27,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY docker_webhook_bot.py .
+COPY quiz/ ./quiz/
 COPY birthday_images/ ./birthday_images/
 COPY layla_images/ ./layla_images/
 
