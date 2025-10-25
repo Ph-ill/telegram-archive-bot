@@ -75,6 +75,9 @@ class SeleniumArchiveBot:
         signal.signal(signal.SIGINT, self.signal_handler)
         
         logger.info(f"Bot initialized - Token: {self.bot_token[:10]}..., Webhook: {self.webhook_url}")
+        
+        # Start birthday monitoring system
+        self.start_birthday_monitor()
     
     def signal_handler(self, signum, frame):
         """Handle graceful shutdown"""
@@ -325,6 +328,60 @@ class SeleniumArchiveBot:
         except Exception as e:
             logger.error(f"Error sending birthday message: {e}")
             return False
+    
+    def start_birthday_monitor(self):
+        """Start the birthday monitoring background task"""
+        def birthday_monitor():
+            while True:
+                try:
+                    self.check_and_send_birthday_messages()
+                    # Check every minute
+                    time.sleep(60)
+                except Exception as e:
+                    logger.error(f"Error in birthday monitor: {e}")
+                    time.sleep(60)  # Continue checking even if there's an error
+        
+        # Start monitor in background thread
+        monitor_thread = threading.Thread(target=birthday_monitor, daemon=True)
+        monitor_thread.start()
+        logger.info("Birthday monitor started - checking every minute")
+    
+    def check_and_send_birthday_messages(self):
+        """Check if it's midnight in any user's timezone and send birthday messages"""
+        try:
+            birthdays = self.load_birthdays()
+            if not birthdays:
+                return
+            
+            current_utc = datetime.now(pytz.UTC)
+            
+            for username, data in birthdays.items():
+                try:
+                    # Get user's timezone
+                    user_tz = pytz.timezone(data['timezone'])
+                    user_time = current_utc.astimezone(user_tz)
+                    
+                    # Check if it's midnight (00:00) in user's timezone
+                    if user_time.hour == 0 and user_time.minute == 0:
+                        # Check if it's their birthday today
+                        birth_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+                        today = user_time.date()
+                        
+                        if birth_date.month == today.month and birth_date.day == today.day:
+                            # Calculate age
+                            age = today.year - birth_date.year
+                            if today < birth_date.replace(year=today.year):
+                                age -= 1
+                            
+                            # Send birthday message to the main group chat
+                            logger.info(f"Sending automatic birthday message for {username} (age {age})")
+                            self.send_birthday_message(username, age, -1002220894500)
+                            
+                except Exception as e:
+                    logger.error(f"Error checking birthday for {username}: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Error in birthday check: {e}")
     
     def process_birthday_command(self, text, sender_name, sender_username, sender_id, chat_id):
         """Process birthday-related commands"""
@@ -636,33 +693,13 @@ class SeleniumArchiveBot:
             # Get appropriate birthday message using the birthday message system
             message = self.get_birthday_message(random_username, age)
             
-            # Get random birthday image
-            image_path = self.get_random_birthday_image()
+            # Send the actual birthday message (same as automatic system would send)
+            success = self.send_birthday_message(random_username, age, chat_id)
             
-            test_header = f"🧪 TEST BIRTHDAY MESSAGE (using @{random_username}, age {age}):\n\n"
-            
-            if image_path:
-                # Send with image
-                import requests
-                url = f"{self.telegram_api_url}/sendAnimation"
-                
-                with open(image_path, 'rb') as gif_file:
-                    files = {'animation': gif_file}
-                    data = {
-                        'chat_id': chat_id,
-                        'caption': f"{test_header}{message}"
-                    }
-                    response = requests.post(url, files=files, data=data, timeout=30)
-                    
-                    if response.status_code == 200:
-                        return f"✅ Test birthday message sent using @{random_username}'s data!"
-                    else:
-                        return f"❌ Failed to send test message: {response.text}"
+            if success:
+                return f"✅ Sent realistic birthday message for @{random_username} (age {age})"
             else:
-                # Send text only
-                test_message = f"{test_header}{message}"
-                success = self.send_message(chat_id, test_message)
-                return f"✅ Test birthday message sent using @{random_username}'s data!" if success else "❌ Failed to send test message"
+                return "❌ Failed to send birthday message"
                 
         except Exception as e:
             logger.error(f"Error sending test birthday message: {e}")
