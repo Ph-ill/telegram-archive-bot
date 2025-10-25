@@ -431,14 +431,23 @@ class QuizManager:
 
 <b>How to Play:</b>
 1. Someone starts a quiz with <code>/quiz_new</code>
-2. Questions appear with multiple choice buttons
-3. Click your answer quickly - first correct answer wins!
-4. Earn 1 point for each correct answer
-5. View scores anytime with <code>/quiz_leaderboard</code>
+2. Questions appear with answer options (A, B, C, D) and buttons
+3. Each player gets <b>one attempt per question</b>
+4. Click your chosen answer button (🔘 A, 🔘 B, etc.)
+5. Wrong answers are acknowledged but question stays active
+6. <b>First correct answer wins the point</b> and advances to next question
+7. View scores anytime with <code>/quiz_leaderboard</code>
 
 <b>Rules:</b>
 • Only one quiz per chat at a time
+• One attempt per player per question (no spam clicking!)
 • First person to answer correctly gets the point
+• Question advances only when someone answers correctly
 • Quiz ends when all questions are answered or someone uses <code>/quiz_stop</code>
+
+<b>Strategy Tips:</b>
+• Read the question and all options carefully
+• You only get one shot per question, so choose wisely!
+• Speed matters - first correct answer wins
 
 Have fun! 🎉</blockquote>"""
