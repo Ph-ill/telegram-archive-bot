@@ -1988,12 +1988,17 @@ class SeleniumArchiveBot:
         result = self.quiz_manager.create_quiz(chat_id, subject, num_questions, difficulty)
         
         if result['success']:
+            # Check if previous quiz was stopped
+            previous_result = ""
+            if result.get('previous_quiz_stopped'):
+                previous_result = "🔄 Previous quiz stopped.\n\n"
+            
             # Quiz created successfully, send first question
             first_question = result['quiz_data'].get('first_question')
             if first_question:
                 # Add question index to the question data
                 first_question['question_index'] = 0
-                quiz_ui.send_question(chat_id, first_question, 1, num_questions)
+                quiz_ui.send_question(chat_id, first_question, 1, num_questions, previous_result)
                 return None  # Don't send additional text response
             else:
                 return "✅ Quiz created successfully, but no questions were generated."

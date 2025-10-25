@@ -46,13 +46,31 @@ class QuizManager:
             Dictionary with success status and message/error details
         """
         try:
-            # Check if quiz is already active
+            # Check if quiz is already active and stop it automatically
+            previous_quiz_stopped = False
             if self.is_quiz_active(chat_id):
-                return {
-                    'success': False,
-                    'error': 'A quiz is already active in this chat. Use /quiz_stop to end it first.',
-                    'error_type': 'quiz_active'
-                }
+                logger.info(f"Stopping previous quiz in chat {chat_id} to start new one")
+                
+                # Get tracked message IDs before stopping quiz for cleanup
+                tracked_messages = self.state_manager.get_tracked_message_ids(chat_id)
+                
+                stop_result = self.stop_quiz(chat_id, record_win=False)  # Don't record win for interrupted quiz
+                if stop_result['success']:
+                    previous_quiz_stopped = True
+                    logger.info(f"Successfully stopped previous quiz in chat {chat_id}")
+                    
+                    # Clean up previous quiz messages
+                    if tracked_messages:
+                        try:
+                            from .quiz_ui import QuizUI
+                            quiz_ui = QuizUI(self.bot_instance)
+                            deleted_count = quiz_ui.delete_quiz_messages(chat_id, tracked_messages)
+                            logger.info(f"Cleaned up {deleted_count} messages from previous quiz in chat {chat_id}")
+                        except Exception as e:
+                            logger.warning(f"Failed to clean up previous quiz messages in chat {chat_id}: {e}")
+                else:
+                    logger.warning(f"Failed to stop previous quiz in chat {chat_id}: {stop_result.get('error', 'Unknown error')}")
+                    # Continue anyway - try to start new quiz
             
             # Validate parameters
             validation_result = self._validate_quiz_parameters(subject, num_questions, difficulty)
@@ -100,6 +118,7 @@ class QuizManager:
             logger.info(f"Quiz created successfully for chat {chat_id}")
             return {
                 'success': True,
+                'previous_quiz_stopped': previous_quiz_stopped,
                 'quiz_data': {
                     'subject': subject,
                     'num_questions': num_questions,
