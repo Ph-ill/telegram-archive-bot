@@ -1208,39 +1208,34 @@ class SeleniumArchiveBot:
             
             logger.info("Fetching startup idea from API...")
             
-            # Get random startup idea
-            startup_response = requests.get("https://itsthisforthat.com/api.php", timeout=10)
+            # Get random startup idea using the correct API endpoint
+            startup_response = requests.get("https://itsthisforthat.com/api.php?json", timeout=10)
             
             if startup_response.status_code != 200:
                 return "❌ Failed to fetch startup idea. Please try again later."
             
-            # Check if response is JSON or plain text
+            # Parse JSON response
             try:
                 startup_data = startup_response.json()
                 startup_idea = startup_data.get('this', 'Unknown') + " for " + startup_data.get('that', 'Unknown')
-            except json.JSONDecodeError:
-                # API might return plain text, let's check the content
-                response_text = startup_response.text.strip()
-                logger.info(f"API response (non-JSON): {response_text}")
-                
-                if response_text:
-                    startup_idea = response_text
-                else:
-                    # Fallback to manual startup ideas if API fails
-                    fallback_ideas = [
-                        "Uber for Dogs",
-                        "Netflix for Books", 
-                        "Spotify for Podcasts",
-                        "Instagram for Food",
-                        "Airbnb for Workspaces",
-                        "Tinder for Business Networking",
-                        "Amazon for Local Services",
-                        "YouTube for Education",
-                        "WhatsApp for Teams",
-                        "Google Maps for Indoor Navigation"
-                    ]
-                    startup_idea = random.choice(fallback_ideas)
-                    logger.info(f"Using fallback startup idea: {startup_idea}")
+                logger.info(f"Generated startup idea: {startup_idea}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse JSON response: {e}")
+                # Fallback to manual startup ideas if API fails
+                fallback_ideas = [
+                    "Uber for Dogs",
+                    "Netflix for Books", 
+                    "Spotify for Podcasts",
+                    "Instagram for Food",
+                    "Airbnb for Workspaces",
+                    "Tinder for Business Networking",
+                    "Amazon for Local Services",
+                    "YouTube for Education",
+                    "WhatsApp for Teams",
+                    "Google Maps for Indoor Navigation"
+                ]
+                startup_idea = random.choice(fallback_ideas)
+                logger.info(f"Using fallback startup idea: {startup_idea}")
             
             logger.info(f"Generated startup idea: {startup_idea}")
             
@@ -1256,10 +1251,14 @@ class SeleniumArchiveBot:
             if image_url:
                 # Send image with startup idea as caption
                 telegram_url = f"{self.telegram_api_url}/sendPhoto"
+                # Escape HTML characters in startup idea
+                import html
+                escaped_idea = html.escape(startup_idea)
+                
                 data = {
                     'chat_id': chat_id,
                     'photo': image_url,
-                    'caption': f"💡 <b>Random Startup Idea:</b>\n\n<i>{startup_idea}</i>\n\n🚀 Ready to disrupt the market?",
+                    'caption': f"💡 <b>Random Startup Idea:</b>\n\n<i>{escaped_idea}</i>\n\n🚀 Ready to disrupt the market?",
                     'parse_mode': 'HTML'
                 }
                 
@@ -1271,10 +1270,14 @@ class SeleniumArchiveBot:
                 else:
                     logger.warning(f"Failed to send image, sending text only: {response.text}")
                     # Fallback to text only
-                    return f"💡 <b>Random Startup Idea:</b>\n\n<i>{startup_idea}</i>\n\n🚀 Ready to disrupt the market?"
+                    import html
+                    escaped_idea = html.escape(startup_idea)
+                    return f"💡 <b>Random Startup Idea:</b>\n\n<i>{escaped_idea}</i>\n\n🚀 Ready to disrupt the market?"
             else:
                 # No image found, send text only
-                return f"💡 <b>Random Startup Idea:</b>\n\n<i>{startup_idea}</i>\n\n🚀 Ready to disrupt the market?"
+                import html
+                escaped_idea = html.escape(startup_idea)
+                return f"💡 <b>Random Startup Idea:</b>\n\n<i>{escaped_idea}</i>\n\n🚀 Ready to disrupt the market?"
                 
         except Exception as e:
             logger.error(f"Error in startup command: {e}")
