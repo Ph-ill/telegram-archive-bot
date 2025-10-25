@@ -4,3 +4,4 @@ gunicorn==21.2.0
 selenium==4.15.2
 pytz==2023.3
 python-dateutil==2.8.2
+google-generativeai>=0.3.0

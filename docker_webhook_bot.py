@@ -52,11 +52,14 @@ class SeleniumArchiveBot:
         self.bot_token = os.environ.get('BOT_TOKEN')
         self.webhook_url = os.environ.get('WEBHOOK_URL')
         self.port = int(os.environ.get('PORT', 8443))
+        self.gemini_api_key = os.environ.get('GEMINI_API_KEY')
         
         if not self.bot_token:
             raise ValueError("BOT_TOKEN environment variable is required")
         if not self.webhook_url:
             raise ValueError("WEBHOOK_URL environment variable is required")
+        if not self.gemini_api_key:
+            logger.warning("GEMINI_API_KEY environment variable not set - quiz functionality will be disabled")
         
         self.telegram_api_url = f"https://api.telegram.org/bot{self.bot_token}"
         
@@ -80,6 +83,19 @@ class SeleniumArchiveBot:
         
         # Start birthday monitoring system
         self.start_birthday_monitor()
+        
+        # Initialize quiz manager if API key is available
+        self.quiz_manager = None
+        if self.gemini_api_key:
+            try:
+                from quiz.quiz_manager import QuizManager
+                self.quiz_manager = QuizManager(self, self.data_dir, self.gemini_api_key)
+                logger.info("Quiz manager initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize quiz manager: {e}")
+                self.quiz_manager = None
+        else:
+            logger.info("Quiz functionality disabled - GEMINI_API_KEY not provided")
     
     def get_bot_username(self):
         """Get bot username from Telegram API"""
@@ -698,6 +714,15 @@ class SeleniumArchiveBot:
         help_text += f"• /birthday_set{bot_mention} &lt;YYYY-MM-DD&gt; &lt;Timezone&gt; [username] - Set birthday\n"
         help_text += f"  Example: /birthday_set{bot_mention} 1990-03-15 America/New_York\n\n"
         
+        # Quiz commands (if available)
+        if self.quiz_manager:
+            help_text += "🎯 Quiz Commands:\n"
+            help_text += f"• /quiz_new{bot_mention} &lt;Subject&gt; [Number] [Difficulty] - Start a new quiz\n"
+            help_text += f"  Example: /quiz_new{bot_mention} Python Programming 5 medium\n"
+            help_text += f"• /quiz_leaderboard{bot_mention} - Show current quiz scores\n"
+            help_text += f"• /quiz_stop{bot_mention} - Stop the current quiz\n"
+            help_text += f"• /quiz_help{bot_mention} - Detailed quiz help and rules\n\n"
+        
         # Fun commands
         help_text += "🎯 Activity &amp; Fun Commands:\n"
         help_text += f"• /layla{bot_mention} - Send a random Layla image\n"
@@ -947,6 +972,10 @@ class SeleniumArchiveBot:
         
         elif command == "/iss":
             return self.handle_iss_command()
+        
+        # Quiz commands
+        elif command in ["/quiz_new", "/quiz_leaderboard", "/quiz_stop", "/quiz_help"]:
+            return self.handle_quiz_command(command, args, sender_name, sender_username, sender_id, chat_id)
         
         # Admin-only commands
         elif command in ["/test_birthday", "/delete_birthday", "/list_birthdays", "/add_birthday_message", 
@@ -1625,6 +1654,110 @@ class SeleniumArchiveBot:
         
         return f"At {lat_desc}, {lon_desc}"
     
+    def handle_quiz_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
+        """Handle quiz-related commands"""
+        if not self.quiz_manager:
+            return "❌ Quiz functionality is not available. Please check that GEMINI_API_KEY is configured."
+        
+        try:
+            if command == "/quiz_new":
+                return self.handle_quiz_new_command(args, sender_name, chat_id)
+            elif command == "/quiz_leaderboard":
+                return self.handle_quiz_leaderboard_command(chat_id)
+            elif command == "/quiz_stop":
+                return self.handle_quiz_stop_command(chat_id)
+            elif command == "/quiz_help":
+                return self.quiz_manager.get_help_text()
+            else:
+                return f"Unknown quiz command: {command}"
+                
+        except Exception as e:
+            logger.error(f"Error handling quiz command {command}: {e}")
+            return "❌ An error occurred while processing the quiz command. Please try again."
+    
+    def handle_quiz_new_command(self, args, sender_name, chat_id):
+        """Handle /quiz_new command"""
+        if not args.strip():
+            return "Please provide quiz parameters.\nFormat: /quiz_new [Subject] [Number] [Difficulty]\nExample: /quiz_new Python Programming 5 medium"
+        
+        # Parse arguments
+        parts = args.strip().split()
+        if len(parts) < 1:
+            return "Please provide at least a subject for the quiz.\nExample: /quiz_new Python Programming"
+        
+        # Extract subject (everything except last 1-2 parts if they're numbers/difficulty)
+        subject_parts = []
+        num_questions = 5  # default
+        difficulty = "medium"  # default
+        
+        # Check if last part is a difficulty level
+        if len(parts) > 1 and parts[-1].lower() in ['easy', 'medium', 'hard', 'expert']:
+            difficulty = parts[-1].lower()
+            parts = parts[:-1]
+        
+        # Check if last part is a number
+        if len(parts) > 1:
+            try:
+                num_questions = int(parts[-1])
+                parts = parts[:-1]
+            except ValueError:
+                pass  # Not a number, include in subject
+        
+        # Remaining parts form the subject
+        subject = " ".join(parts)
+        
+        # Send progress message first
+        from quiz.quiz_ui import QuizUI
+        quiz_ui = QuizUI(self)
+        progress_msg_id = quiz_ui.send_quiz_progress(chat_id, subject, num_questions, difficulty)
+        
+        # Create the quiz
+        result = self.quiz_manager.create_quiz(chat_id, subject, num_questions, difficulty)
+        
+        if result['success']:
+            # Quiz created successfully, send first question
+            first_question = result['quiz_data'].get('first_question')
+            if first_question:
+                # Add question index to the question data
+                first_question['question_index'] = 0
+                quiz_ui.send_question(chat_id, first_question, 1, num_questions)
+                return None  # Don't send additional text response
+            else:
+                return "✅ Quiz created successfully, but no questions were generated."
+        else:
+            # Quiz creation failed
+            error_message = quiz_ui.format_error_message(result['error_type'], result['error'])
+            return error_message
+    
+    def handle_quiz_leaderboard_command(self, chat_id):
+        """Handle /quiz_leaderboard command"""
+        result = self.quiz_manager.get_leaderboard(chat_id)
+        
+        if result['success']:
+            from quiz.quiz_ui import QuizUI
+            quiz_ui = QuizUI(self)
+            quiz_ui.send_leaderboard(chat_id, result['leaderboard'], result['quiz_info'], is_final=False)
+            return None  # Don't send additional text response
+        else:
+            from quiz.quiz_ui import QuizUI
+            quiz_ui = QuizUI(self)
+            return quiz_ui.format_error_message(result['error_type'], result['error'])
+    
+    def handle_quiz_stop_command(self, chat_id):
+        """Handle /quiz_stop command"""
+        result = self.quiz_manager.stop_quiz(chat_id)
+        
+        if result['success']:
+            from quiz.quiz_ui import QuizUI
+            quiz_ui = QuizUI(self)
+            if result['final_leaderboard']:
+                quiz_ui.send_leaderboard(chat_id, result['final_leaderboard'], result['quiz_info'], is_final=True)
+            return "🏁 Quiz stopped successfully!"
+        else:
+            from quiz.quiz_ui import QuizUI
+            quiz_ui = QuizUI(self)
+            return quiz_ui.format_error_message(result['error_type'], result['error'])
+    
     def handle_admin_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
         """Handle admin-only commands"""
         # Check if user is admin
@@ -1757,6 +1890,12 @@ class SeleniumArchiveBot:
     def process_webhook_update(self, update):
         """Process incoming webhook update"""
         try:
+            # Handle callback queries (inline keyboard button presses)
+            callback_query = update.get('callback_query')
+            if callback_query:
+                self.process_callback_query(callback_query)
+                return
+            
             # Extract message info
             message = update.get('message')
             if not message:
@@ -1800,6 +1939,117 @@ class SeleniumArchiveBot:
             
         except Exception as e:
             logger.error(f"Error processing webhook update: {e}")
+    
+    def process_callback_query(self, callback_query):
+        """Process callback query from inline keyboard buttons"""
+        try:
+            if not self.quiz_manager:
+                return
+            
+            callback_data = callback_query.get('data', '')
+            user = callback_query.get('from', {})
+            message = callback_query.get('message', {})
+            
+            user_id = user.get('id')
+            username = user.get('username') or f"user_{user_id}"
+            chat_id = message.get('chat', {}).get('id')
+            message_id = message.get('message_id')
+            
+            # Parse callback data using QuizUI
+            from quiz.quiz_ui import QuizUI
+            quiz_ui = QuizUI(self)
+            parsed_data = quiz_ui.parse_callback_data(callback_data)
+            
+            if not parsed_data:
+                # Not a quiz callback, ignore
+                return
+            
+            # Extract quiz callback data
+            question_idx = parsed_data['question_idx']
+            option_idx = parsed_data['option_idx']
+            
+            # Get the current question to find the selected answer
+            current_question = self.quiz_manager.get_current_question(chat_id)
+            if not current_question or current_question.get('question_index') != question_idx:
+                # Question mismatch or no active quiz
+                self.answer_callback_query(callback_query['id'], "❌ This question is no longer active.")
+                return
+            
+            options = current_question.get('options', [])
+            if option_idx >= len(options):
+                self.answer_callback_query(callback_query['id'], "❌ Invalid option selected.")
+                return
+            
+            selected_answer = options[option_idx]
+            
+            # Process the answer
+            result = self.quiz_manager.process_answer(chat_id, user_id, username, question_idx, selected_answer)
+            
+            if result['success']:
+                # Update the question message with result
+                quiz_ui.update_question_result(chat_id, message_id, result)
+                
+                if result['is_correct']:
+                    callback_message = f"✅ Correct! +{result['points_awarded']} point"
+                else:
+                    callback_message = f"❌ Wrong answer. Correct: {result['correct_answer']}"
+                
+                self.answer_callback_query(callback_query['id'], callback_message)
+                
+                # Check if quiz is complete or send next question
+                if result.get('quiz_complete'):
+                    # Send final leaderboard
+                    final_leaderboard = result.get('final_leaderboard', {})
+                    if final_leaderboard.get('success'):
+                        quiz_ui.send_leaderboard(
+                            chat_id, 
+                            final_leaderboard['leaderboard'], 
+                            final_leaderboard['quiz_info'], 
+                            is_final=True
+                        )
+                elif result.get('next_question'):
+                    # Send next question
+                    next_question = result['next_question']
+                    quiz_status = self.quiz_manager.get_quiz_status(chat_id)
+                    current_q_num = quiz_status.get('answered_questions', 0) + 1
+                    total_questions = quiz_status.get('total_questions', 0)
+                    quiz_ui.send_question(chat_id, next_question, current_q_num, total_questions)
+            else:
+                # Answer processing failed
+                error_message = quiz_ui.format_error_message(result['error_type'], result['error'])
+                if result['error_type'] == 'already_answered':
+                    self.answer_callback_query(callback_query['id'], "⏰ Too late! Someone else answered first.")
+                else:
+                    self.answer_callback_query(callback_query['id'], "❌ Error processing answer.")
+                    
+        except Exception as e:
+            logger.error(f"Error processing callback query: {e}")
+            try:
+                self.answer_callback_query(callback_query.get('id'), "❌ An error occurred.")
+            except:
+                pass
+    
+    def answer_callback_query(self, callback_query_id, text=None, show_alert=False):
+        """Answer a callback query (acknowledge button press)"""
+        try:
+            import requests
+            
+            url = f"{self.telegram_api_url}/answerCallbackQuery"
+            data = {
+                'callback_query_id': callback_query_id,
+                'show_alert': show_alert
+            }
+            
+            if text:
+                data['text'] = text
+            
+            response = requests.post(url, json=data, timeout=10)
+            
+            if response.status_code != 200:
+                logger.warning(f"Failed to answer callback query: {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Error answering callback query: {e}")
     
     def setup_routes(self):
         """Set up Flask routes for webhook"""
