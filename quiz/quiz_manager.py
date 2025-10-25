@@ -406,7 +406,7 @@ class QuizManager:
         """
         return """🎯 **Quiz Commands Help**
 
-**Start a New Quiz:**
+<blockquote expandable>**Start a New Quiz:**
 `/quiz_new [Subject] [Number] [Difficulty]`
 
 • **Subject**: Topic for the quiz (required)
@@ -435,4 +435,4 @@ class QuizManager:
 • First person to answer correctly gets the point
 • Quiz ends when all questions are answered or someone uses `/quiz_stop`
 
-Have fun! 🎉"""
+Have fun! 🎉</blockquote>"""

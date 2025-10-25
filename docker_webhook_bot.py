@@ -1943,10 +1943,9 @@ class SeleniumArchiveBot:
                 # Mark as processed
                 self.processed_messages.add(msg_key)
                 
-                # Send reply (disable web page preview for help messages)
-                is_help_message = ("Angel Dimi Bot Commands:" in reply_text or 
-                                 "Quiz Commands Help" in reply_text or
-                                 "🎯 **Quiz Commands Help**" in reply_text)
+                # Send reply (disable web page preview for all help messages)
+                is_help_message = ("/help" in text.lower() or "/start" in text.lower() or 
+                                 "/quiz_help" in text.lower() or "Commands:" in reply_text)
                 success = self.send_message(chat_id, reply_text, message_id, disable_web_page_preview=is_help_message)
                 if success:
                     logger.info(f"Successfully processed and replied to message {msg_key}")
