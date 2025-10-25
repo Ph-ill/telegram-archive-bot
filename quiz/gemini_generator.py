@@ -45,8 +45,8 @@ class GeminiQuestionGenerator:
         
         try:
             genai.configure(api_key=self.api_key)
-            # Try the current free model names
-            model_names = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-pro']
+            # Try the current available model names (based on API response)
+            model_names = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash', 'gemini-pro-latest']
             
             for model_name in model_names:
                 try:
