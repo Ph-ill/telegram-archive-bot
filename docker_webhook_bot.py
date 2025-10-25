@@ -663,7 +663,11 @@ class SeleniumArchiveBot:
         help_text += "• /bored_participants@Angel_Dimi_Bot &lt;number&gt; - Get activity for specific number of people\n"
         help_text += "• /bored_price@Angel_Dimi_Bot &lt;range&gt; - Get activity by cost (free, low, medium, high)\n"
         help_text += "• /age_guess@Angel_Dimi_Bot &lt;name&gt; - Predict someone's age based on their name\n"
-        help_text += "  Example: /age_guess@Angel_Dimi_Bot John\n\n"
+        help_text += "  Example: /age_guess@Angel_Dimi_Bot John\n"
+        help_text += "• /xkcd_latest@Angel_Dimi_Bot - Get the latest XKCD comic\n"
+        help_text += "• /xkcd_random@Angel_Dimi_Bot - Get a random XKCD comic\n"
+        help_text += "• /xkcd_number@Angel_Dimi_Bot &lt;number&gt; - Get a specific XKCD comic\n"
+        help_text += "  Example: /xkcd_number@Angel_Dimi_Bot 353\n\n"
         
         # Special user commands
         if is_special_user:
@@ -886,6 +890,15 @@ class SeleniumArchiveBot:
         
         elif command == "/age_guess":
             return self.handle_age_guess_command(args)
+        
+        elif command == "/xkcd_latest":
+            return self.handle_xkcd_latest_command()
+        
+        elif command == "/xkcd_random":
+            return self.handle_xkcd_random_command()
+        
+        elif command == "/xkcd_number":
+            return self.handle_xkcd_number_command(args)
         
         # Admin-only commands
         elif command in ["/test_birthday", "/delete_birthday", "/list_birthdays", "/add_birthday_message", 
@@ -1271,6 +1284,127 @@ class SeleniumArchiveBot:
             logger.error(f"Error getting age prediction: {e}")
             return "❌ Error getting age prediction. Please try again later."
     
+    def handle_xkcd_latest_command(self):
+        """Handle /xkcd_latest command - get the latest XKCD comic"""
+        try:
+            import requests
+            
+            response = requests.get("https://xkcd.com/info.0.json", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return self.format_xkcd_response(data, "Latest")
+            else:
+                return "❌ Failed to get latest XKCD comic. Please try again later."
+                
+        except Exception as e:
+            logger.error(f"Error getting latest XKCD: {e}")
+            return "❌ Error getting latest XKCD comic. Please try again later."
+    
+    def handle_xkcd_random_command(self):
+        """Handle /xkcd_random command - get a random XKCD comic"""
+        try:
+            import requests
+            
+            # First get the latest comic number
+            latest_response = requests.get("https://xkcd.com/info.0.json", timeout=10)
+            if latest_response.status_code != 200:
+                return "❌ Failed to get random XKCD comic. Please try again later."
+            
+            latest_num = latest_response.json()['num']
+            
+            # Generate random comic number (avoiding 404 which doesn't exist)
+            random_num = random.randint(1, latest_num)
+            if random_num == 404:
+                random_num = 405  # Skip the non-existent comic 404
+            
+            # Get the random comic
+            response = requests.get(f"https://xkcd.com/{random_num}/info.0.json", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return self.format_xkcd_response(data, "Random")
+            else:
+                return "❌ Failed to get random XKCD comic. Please try again later."
+                
+        except Exception as e:
+            logger.error(f"Error getting random XKCD: {e}")
+            return "❌ Error getting random XKCD comic. Please try again later."
+    
+    def handle_xkcd_number_command(self, args):
+        """Handle /xkcd_number command - get a specific XKCD comic by number"""
+        if not args.strip():
+            return "Please specify a comic number.\n\n" \
+                   "<b>Examples:</b>\n" \
+                   "• /xkcd_number@Angel_Dimi_Bot 1\n" \
+                   "• /xkcd_number@Angel_Dimi_Bot 353\n" \
+                   "• /xkcd_number@Angel_Dimi_Bot 2000\n\n" \
+                   "<b>Note:</b> Comic #404 doesn't exist (it's a joke about HTTP 404 errors)"
+        
+        try:
+            comic_num = int(args.strip())
+            if comic_num < 1:
+                return "❌ Comic number must be 1 or higher."
+            
+            if comic_num == 404:
+                return "❌ Comic #404 doesn't exist! This is an intentional joke about HTTP 404 errors. Try a different number."
+                
+        except ValueError:
+            return "❌ Please provide a valid comic number.\nExample: /xkcd_number@Angel_Dimi_Bot 353"
+        
+        try:
+            import requests
+            
+            response = requests.get(f"https://xkcd.com/{comic_num}/info.0.json", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return self.format_xkcd_response(data, f"Comic #{comic_num}")
+            elif response.status_code == 404:
+                return f"❌ Comic #{comic_num} doesn't exist. Try a lower number or use /xkcd_latest@Angel_Dimi_Bot to see the highest available number."
+            else:
+                return "❌ Failed to get XKCD comic. Please try again later."
+                
+        except Exception as e:
+            logger.error(f"Error getting XKCD comic {comic_num}: {e}")
+            return "❌ Error getting XKCD comic. Please try again later."
+    
+    def format_xkcd_response(self, data, comic_type):
+        """Format XKCD comic data into a nice response"""
+        try:
+            num = data.get('num', 'Unknown')
+            title = data.get('safe_title', data.get('title', 'Untitled'))
+            alt_text = data.get('alt', 'No alt text available')
+            img_url = data.get('img', '')
+            year = data.get('year', 'Unknown')
+            month = data.get('month', 'Unknown')
+            day = data.get('day', 'Unknown')
+            
+            # Format date
+            try:
+                date_str = f"{month}/{day}/{year}"
+                if month != 'Unknown' and day != 'Unknown' and year != 'Unknown':
+                    date_obj = datetime.strptime(f"{year}-{month}-{day}", "%Y-%m-%d")
+                    date_str = date_obj.strftime("%B %d, %Y")
+            except:
+                date_str = f"{month}/{day}/{year}"
+            
+            response = f"📰 <b>{comic_type} XKCD Comic:</b>\n\n" \
+                      f"<b>#{num}: {title}</b>\n" \
+                      f"<b>Published:</b> {date_str}\n\n"
+            
+            if img_url:
+                response += f"<a href='{img_url}'>🖼️ View Comic Image</a>\n\n"
+            
+            response += f"<b>Alt Text:</b> <i>{alt_text}</i>\n\n" \
+                       f"<a href='https://xkcd.com/{num}'>🔗 View on XKCD.com</a>"
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error formatting XKCD response: {e}")
+            return "❌ Error formatting comic information."
+    
     def handle_admin_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
         """Handle admin-only commands"""
         # Check if user is admin
@@ -1512,7 +1646,10 @@ class SeleniumArchiveBot:
                 {"command": "bored_type", "description": "Get activity by type (education, social, etc.)"},
                 {"command": "bored_participants", "description": "Get activity by number of people"},
                 {"command": "bored_price", "description": "Get activity by price range (free, low, high)"},
-                {"command": "age_guess", "description": "Guess someone's age based on their name"}
+                {"command": "age_guess", "description": "Guess someone's age based on their name"},
+                {"command": "xkcd_latest", "description": "Get the latest XKCD comic"},
+                {"command": "xkcd_random", "description": "Get a random XKCD comic"},
+                {"command": "xkcd_number", "description": "Get a specific XKCD comic by number"}
             ]
             
             # Admin commands for special users
@@ -1527,6 +1664,9 @@ class SeleniumArchiveBot:
                 {"command": "bored_participants", "description": "Get activity by number of people"},
                 {"command": "bored_price", "description": "Get activity by price range (free, low, high)"},
                 {"command": "age_guess", "description": "Guess someone's age based on their name"},
+                {"command": "xkcd_latest", "description": "Get the latest XKCD comic"},
+                {"command": "xkcd_random", "description": "Get a random XKCD comic"},
+                {"command": "xkcd_number", "description": "Get a specific XKCD comic by number"},
                 {"command": "test_birthday", "description": "Send test birthday message"},
                 {"command": "delete_birthday", "description": "Delete a user's birthday"},
                 {"command": "list_birthdays", "description": "List all stored birthdays"},
