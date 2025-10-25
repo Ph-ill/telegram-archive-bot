@@ -1206,14 +1206,41 @@ class SeleniumArchiveBot:
             import re
             from urllib.parse import quote
             
+            logger.info("Fetching startup idea from API...")
+            
             # Get random startup idea
             startup_response = requests.get("https://itsthisforthat.com/api.php", timeout=10)
             
             if startup_response.status_code != 200:
                 return "❌ Failed to fetch startup idea. Please try again later."
             
-            startup_data = startup_response.json()
-            startup_idea = startup_data.get('this', 'Unknown') + " for " + startup_data.get('that', 'Unknown')
+            # Check if response is JSON or plain text
+            try:
+                startup_data = startup_response.json()
+                startup_idea = startup_data.get('this', 'Unknown') + " for " + startup_data.get('that', 'Unknown')
+            except json.JSONDecodeError:
+                # API might return plain text, let's check the content
+                response_text = startup_response.text.strip()
+                logger.info(f"API response (non-JSON): {response_text}")
+                
+                if response_text:
+                    startup_idea = response_text
+                else:
+                    # Fallback to manual startup ideas if API fails
+                    fallback_ideas = [
+                        "Uber for Dogs",
+                        "Netflix for Books", 
+                        "Spotify for Podcasts",
+                        "Instagram for Food",
+                        "Airbnb for Workspaces",
+                        "Tinder for Business Networking",
+                        "Amazon for Local Services",
+                        "YouTube for Education",
+                        "WhatsApp for Teams",
+                        "Google Maps for Indoor Navigation"
+                    ]
+                    startup_idea = random.choice(fallback_ideas)
+                    logger.info(f"Using fallback startup idea: {startup_idea}")
             
             logger.info(f"Generated startup idea: {startup_idea}")
             
