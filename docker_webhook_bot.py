@@ -912,13 +912,13 @@ class SeleniumArchiveBot:
             return self.handle_age_guess_command(args)
         
         elif command == "/xkcd_latest":
-            return self.handle_xkcd_latest_command()
+            return self.handle_xkcd_latest_command(chat_id)
         
         elif command == "/xkcd_random":
-            return self.handle_xkcd_random_command()
+            return self.handle_xkcd_random_command(chat_id)
         
         elif command == "/xkcd_number":
-            return self.handle_xkcd_number_command(args)
+            return self.handle_xkcd_number_command(args, chat_id)
         
         # Admin-only commands
         elif command in ["/test_birthday", "/delete_birthday", "/list_birthdays", "/add_birthday_message", 
@@ -1304,7 +1304,7 @@ class SeleniumArchiveBot:
             logger.error(f"Error getting age prediction: {e}")
             return "❌ Error getting age prediction. Please try again later."
     
-    def handle_xkcd_latest_command(self):
+    def handle_xkcd_latest_command(self, chat_id):
         """Handle /xkcd_latest command - get the latest XKCD comic"""
         try:
             import requests
@@ -1313,7 +1313,7 @@ class SeleniumArchiveBot:
             
             if response.status_code == 200:
                 data = response.json()
-                return self.format_xkcd_response(data, "Latest")
+                return self.send_xkcd_comic(data, chat_id)
             else:
                 return "❌ Failed to get latest XKCD comic. Please try again later."
                 
@@ -1321,7 +1321,7 @@ class SeleniumArchiveBot:
             logger.error(f"Error getting latest XKCD: {e}")
             return "❌ Error getting latest XKCD comic. Please try again later."
     
-    def handle_xkcd_random_command(self):
+    def handle_xkcd_random_command(self, chat_id):
         """Handle /xkcd_random command - get a random XKCD comic"""
         try:
             import requests
@@ -1343,7 +1343,7 @@ class SeleniumArchiveBot:
             
             if response.status_code == 200:
                 data = response.json()
-                return self.format_xkcd_response(data, "Random")
+                return self.send_xkcd_comic(data, chat_id)
             else:
                 return "❌ Failed to get random XKCD comic. Please try again later."
                 
@@ -1351,7 +1351,7 @@ class SeleniumArchiveBot:
             logger.error(f"Error getting random XKCD: {e}")
             return "❌ Error getting random XKCD comic. Please try again later."
     
-    def handle_xkcd_number_command(self, args):
+    def handle_xkcd_number_command(self, args, chat_id):
         """Handle /xkcd_number command - get a specific XKCD comic by number"""
         if not args.strip():
             return "Please specify a comic number.\n\n" \
@@ -1379,7 +1379,7 @@ class SeleniumArchiveBot:
             
             if response.status_code == 200:
                 data = response.json()
-                return self.format_xkcd_response(data, f"Comic #{comic_num}")
+                return self.send_xkcd_comic(data, chat_id)
             elif response.status_code == 404:
                 return f"❌ Comic #{comic_num} doesn't exist. Try a lower number or use /xkcd_latest@Angel_Dimi_Bot to see the highest available number."
             else:
@@ -1389,41 +1389,45 @@ class SeleniumArchiveBot:
             logger.error(f"Error getting XKCD comic {comic_num}: {e}")
             return "❌ Error getting XKCD comic. Please try again later."
     
-    def format_xkcd_response(self, data, comic_type):
-        """Format XKCD comic data into a nice response"""
+    def send_xkcd_comic(self, data, chat_id):
+        """Send XKCD comic image with simple caption"""
         try:
+            import requests
+            
             num = data.get('num', 'Unknown')
             title = data.get('safe_title', data.get('title', 'Untitled'))
-            alt_text = data.get('alt', 'No alt text available')
             img_url = data.get('img', '')
-            year = data.get('year', 'Unknown')
-            month = data.get('month', 'Unknown')
-            day = data.get('day', 'Unknown')
             
-            # Format date
-            try:
-                date_str = f"{month}/{day}/{year}"
-                if month != 'Unknown' and day != 'Unknown' and year != 'Unknown':
-                    date_obj = datetime.strptime(f"{year}-{month}-{day}", "%Y-%m-%d")
-                    date_str = date_obj.strftime("%B %d, %Y")
-            except:
-                date_str = f"{month}/{day}/{year}"
+            if not img_url:
+                return f"#{num}: {title}\n❌ No image available for this comic."
             
-            response = f"📰 <b>{comic_type} XKCD Comic:</b>\n\n" \
-                      f"<b>#{num}: {title}</b>\n" \
-                      f"<b>Published:</b> {date_str}\n\n"
+            # Simple caption: just number and title
+            caption = f"#{num}: {title}"
             
-            if img_url:
-                response += f"<a href='{img_url}'>🖼️ View Comic Image</a>\n\n"
+            # Send the comic image directly
+            url = f"{self.telegram_api_url}/sendPhoto"
             
-            response += f"<b>Alt Text:</b> <i>{alt_text}</i>\n\n" \
-                       f"<a href='https://xkcd.com/{num}'>🔗 View on XKCD.com</a>"
-            
-            return response
-            
+            # Download and send the image
+            img_response = requests.get(img_url, timeout=30)
+            if img_response.status_code == 200:
+                files = {'photo': ('xkcd.png', img_response.content, 'image/png')}
+                data_payload = {
+                    'chat_id': chat_id,
+                    'caption': caption
+                }
+                response = requests.post(url, files=files, data=data_payload, timeout=30)
+                
+                if response.status_code == 200:
+                    return None  # Don't send text response when image is sent successfully
+                else:
+                    logger.error(f"Failed to send XKCD image: {response.text}")
+                    return f"{caption}\n❌ Failed to send comic image."
+            else:
+                return f"{caption}\n❌ Failed to download comic image."
+                
         except Exception as e:
-            logger.error(f"Error formatting XKCD response: {e}")
-            return "❌ Error formatting comic information."
+            logger.error(f"Error sending XKCD comic: {e}")
+            return "❌ Error sending XKCD comic."
     
     def handle_admin_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
         """Handle admin-only commands"""
