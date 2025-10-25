@@ -45,8 +45,19 @@ class GeminiQuestionGenerator:
         
         try:
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
-            logger.info("Gemini API client initialized successfully")
+            # Try the current free model names
+            model_names = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-pro']
+            
+            for model_name in model_names:
+                try:
+                    self.model = genai.GenerativeModel(model_name)
+                    logger.info(f"Gemini API client initialized successfully with model: {model_name}")
+                    break
+                except Exception as model_error:
+                    logger.warning(f"Failed to initialize model {model_name}: {model_error}")
+                    continue
+            else:
+                raise Exception("No valid Gemini model found")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini API client: {e}")
             raise
@@ -400,6 +411,29 @@ Important:
             'correct_answer': correct_answer
         }
     
+    def list_available_models(self) -> list:
+        """
+        List available Gemini models for debugging
+        
+        Returns:
+            List of available model names
+        """
+        try:
+            if not GENAI_AVAILABLE:
+                return []
+            
+            models = genai.list_models()
+            model_names = []
+            for model in models:
+                if 'generateContent' in model.supported_generation_methods:
+                    model_names.append(model.name)
+                    logger.info(f"Available model: {model.name}")
+            
+            return model_names
+        except Exception as e:
+            logger.error(f"Failed to list models: {e}")
+            return []
+    
     def test_api_connection(self) -> bool:
         """
         Test the API connection with a simple request
@@ -410,6 +444,11 @@ Important:
         try:
             if not self.model:
                 logger.warning("API connection test failed - model not initialized")
+                # Try to list available models for debugging
+                logger.info("Attempting to list available models...")
+                available_models = self.list_available_models()
+                if available_models:
+                    logger.info(f"Available models: {available_models}")
                 return False
             
             test_response = self.model.generate_content("Say 'API test successful'")
@@ -431,6 +470,11 @@ Important:
                 logger.error(f"API connection test failed - service unavailable: {e}")
             else:
                 logger.error(f"API connection test failed: {e}")
+                # Try to list available models for debugging
+                logger.info("Attempting to list available models...")
+                available_models = self.list_available_models()
+                if available_models:
+                    logger.info(f"Available models: {available_models}")
             return False
         except Exception as e:
             logger.error(f"Gemini API connection test failed: {e}")
