@@ -45,7 +45,7 @@ class GeminiQuestionGenerator:
         
         try:
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-pro')
+            self.model = genai.GenerativeModel('gemini-1.5-flash')
             logger.info("Gemini API client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini API client: {e}")
