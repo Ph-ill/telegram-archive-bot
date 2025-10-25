@@ -2354,19 +2354,27 @@ class SeleniumArchiveBot:
                 self.answer_callback_query(callback_query['id'], callback_message)
                 
                 # Check if quiz is complete or send next question
+                logger.info(f"Quiz result for chat {chat_id}: quiz_complete={result.get('quiz_complete')}, has_next_question={bool(result.get('next_question'))}")
+                
                 if result.get('quiz_complete'):
+                    logger.info(f"Quiz completed for chat {chat_id}, editing final results")
                     # Edit main message with final results
                     final_leaderboard = result.get('final_leaderboard', {})
                     if final_leaderboard.get('success'):
                         quiz_ui.edit_final_results(chat_id, final_leaderboard['leaderboard'], 
                                                  final_leaderboard['quiz_info'], result_text)
+                    else:
+                        logger.warning(f"Final leaderboard not successful for chat {chat_id}: {final_leaderboard}")
                 elif result.get('next_question'):
+                    logger.info(f"Advancing to next question for chat {chat_id}")
                     # Edit message with next question and previous result
                     next_question = result['next_question']
                     quiz_status = self.quiz_manager.get_quiz_status(chat_id)
                     current_q_num = quiz_status.get('answered_questions', 0) + 1
                     total_questions = quiz_status.get('total_questions', 0)
                     quiz_ui.send_question(chat_id, next_question, current_q_num, total_questions, result_text)
+                else:
+                    logger.warning(f"No quiz completion or next question for chat {chat_id}. Result: {result}")
             else:
                 # Answer processing failed
                 error_message = quiz_ui.format_error_message(result['error_type'], result['error'])

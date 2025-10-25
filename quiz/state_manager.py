@@ -571,15 +571,20 @@ class QuizStateManager:
                 current_idx = quiz_state.get('current_question', 0)
                 
                 # Check if there are more questions
+                logger.info(f"Advance check: current_idx={current_idx}, total_questions={len(questions)}")
+                
                 if current_idx + 1 >= len(questions):
                     # Quiz is complete
+                    logger.info(f"Quiz complete for chat {chat_id}: no more questions")
                     quiz_state['active'] = False
                     self._write_data(data)
                     return False
                 
                 # Advance to next question
-                quiz_state['current_question'] = current_idx + 1
+                new_idx = current_idx + 1
+                quiz_state['current_question'] = new_idx
                 self._write_data(data)
+                logger.info(f"Advanced to question {new_idx} for chat {chat_id}")
                 return True
             except Exception as e:
                 logger.error(f"Failed to advance to next question in chat {chat_id}: {e}")

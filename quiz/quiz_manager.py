@@ -198,15 +198,20 @@ class QuizManager:
                 
                 # Check if quiz is complete
                 current_question = quiz_state.get('current_question', 0)
+                logger.info(f"Question {question_idx} answered, current_question={current_question}")
+                
                 if question_idx == current_question:
                     # This was the current question, advance to next
+                    logger.info(f"Attempting to advance to next question for chat {chat_id}")
                     if self.state_manager.advance_to_next_question(chat_id):
                         # More questions available
+                        logger.info(f"Advanced to next question for chat {chat_id}")
                         next_question = self.get_current_question(chat_id)
                         result['next_question'] = next_question
                         result['quiz_complete'] = False
                     else:
                         # Quiz is complete - record win and get final results
+                        logger.info(f"Quiz completed for chat {chat_id}, stopping quiz")
                         final_results = self.stop_quiz(chat_id, record_win=True)
                         result['quiz_complete'] = True
                         result['final_leaderboard'] = {
@@ -214,6 +219,9 @@ class QuizManager:
                             'leaderboard': final_results.get('final_leaderboard', []),
                             'quiz_info': final_results.get('quiz_info', {})
                         }
+                        logger.info(f"Quiz completion result for chat {chat_id}: {result['quiz_complete']}")
+                else:
+                    logger.warning(f"Question {question_idx} answered but current_question is {current_question}")
             else:
                 # Incorrect answer - don't advance question
                 result['points_awarded'] = 0
