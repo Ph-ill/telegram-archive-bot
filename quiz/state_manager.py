@@ -792,8 +792,9 @@ class QuizStateManager:
             return leaderboard[:limit]
         except Exception as e:
             logger.error(f"Error getting persistent leaderboard: {e}")
-            return [] 
-   def check_quiz_has_multiple_participants(self, chat_id: int) -> bool:
+            return []
+    
+    def check_quiz_has_multiple_participants(self, chat_id: int) -> bool:
         """Check if quiz has multiple participants (to prevent solo play wins)"""
         try:
             quiz_state = self.load_quiz_state(chat_id)
