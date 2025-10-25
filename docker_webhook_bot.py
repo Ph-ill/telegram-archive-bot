@@ -1926,9 +1926,11 @@ class SeleniumArchiveBot:
     def handle_quiz_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
         """Handle quiz-related commands"""
         logger.info(f"Quiz command received: {command}, quiz_manager status: {'initialized' if self.quiz_manager else 'None'}")
+        logger.info(f"GEMINI_API_KEY status: {'SET' if self.gemini_api_key else 'NOT SET'}")
         
         if not self.quiz_manager:
             logger.warning("Quiz command called but quiz_manager is None")
+            logger.warning(f"Quiz manager initialization may have failed during bot startup")
             return "❌ Quiz functionality is not available. Please check that GEMINI_API_KEY is configured."
         
         try:
