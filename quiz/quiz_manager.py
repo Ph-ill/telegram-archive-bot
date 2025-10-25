@@ -404,35 +404,35 @@ class QuizManager:
         Returns:
             Formatted help text string
         """
-        return """🎯 **Quiz Commands Help**
+        return """🎯 <b>Quiz Commands Help</b>
 
-<blockquote expandable>**Start a New Quiz:**
-`/quiz_new [Subject] [Number] [Difficulty]`
+<blockquote expandable><b>Start a New Quiz:</b>
+<code>/quiz_new [Subject] [Number] [Difficulty]</code>
 
-• **Subject**: Topic for the quiz (required)
-• **Number**: Number of questions (1-20, default: 5)
-• **Difficulty**: easy, medium, hard, expert (default: medium)
+• <b>Subject</b>: Topic for the quiz (required)
+• <b>Number</b>: Number of questions (1-20, default: 5)
+• <b>Difficulty</b>: easy, medium, hard, expert (default: medium)
 
-**Examples:**
-• `/quiz_new World History 10 hard`
-• `/quiz_new Python Programming 5`
-• `/quiz_new Science`
+<b>Examples:</b>
+• <code>/quiz_new World History 10 hard</code>
+• <code>/quiz_new Python Programming 5</code>
+• <code>/quiz_new Science</code>
 
-**Other Commands:**
-• `/quiz_leaderboard` - Show current scores
-• `/quiz_stop` - End the current quiz
-• `/quiz_help` - Show this help message
+<b>Other Commands:</b>
+• <code>/quiz_leaderboard</code> - Show current scores
+• <code>/quiz_stop</code> - End the current quiz
+• <code>/quiz_help</code> - Show this help message
 
-**How to Play:**
-1. Someone starts a quiz with `/quiz_new`
+<b>How to Play:</b>
+1. Someone starts a quiz with <code>/quiz_new</code>
 2. Questions appear with multiple choice buttons
 3. Click your answer quickly - first correct answer wins!
 4. Earn 1 point for each correct answer
-5. View scores anytime with `/quiz_leaderboard`
+5. View scores anytime with <code>/quiz_leaderboard</code>
 
-**Rules:**
+<b>Rules:</b>
 • Only one quiz per chat at a time
 • First person to answer correctly gets the point
-• Quiz ends when all questions are answered or someone uses `/quiz_stop`
+• Quiz ends when all questions are answered or someone uses <code>/quiz_stop</code>
 
 Have fun! 🎉</blockquote>"""
