@@ -273,50 +273,6 @@ class QuizStateManager:
                     pass
             raise
     
-    def record_quiz_win(self, winner_user_id: int, winner_username: str, quiz_subject: str, 
-                       total_participants: int, quiz_difficulty: str) -> None:
-        """Record a quiz win in the persistent leaderboard"""
-        with self.lock:
-            try:
-                data = self._read_leaderboard_data()
-                user_key = str(winner_user_id)
-                
-                if user_key not in data:
-                    data[user_key] = {
-                        'username': winner_username,
-                        'total_wins': 0,
-                        'subjects_won': {},
-                        'difficulty_wins': {
-                            'easy': 0,
-                            'medium': 0,
-                            'hard': 0,
-                            'expert': 0
-                        },
-                        'last_win_date': None
-                    }
-                
-                # Update stats
-                user_data = data[user_key]
-                user_data['username'] = winner_username  # Update in case username changed
-                user_data['total_wins'] += 1
-                user_data['last_win_date'] = datetime.now().isoformat()
-                
-                # Track subject wins
-                if quiz_subject not in user_data['subjects_won']:
-                    user_data['subjects_won'][quiz_subject] = 0
-                user_data['subjects_won'][quiz_subject] += 1
-                
-                # Track difficulty wins
-                if quiz_difficulty in user_data['difficulty_wins']:
-                    user_data['difficulty_wins'][quiz_difficulty] += 1
-                
-                self._write_leaderboard_data(data)
-                logger.info(f"Recorded quiz win for {winner_username} ({winner_user_id}): {quiz_subject} ({quiz_difficulty})")
-                
-            except Exception as e:
-                logger.error(f"Failed to record quiz win: {e}")
-                raise
-    
     def get_persistent_leaderboard(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get the persistent leaderboard sorted by total wins"""
         try:
@@ -361,6 +317,46 @@ class QuizStateManager:
         except Exception as e:
             logger.error(f"Error checking quiz participants for chat {chat_id}: {e}")
             return False
+    
+    def add_message_id(self, chat_id: int, message_id: int) -> None:
+        """Add a message ID to track for later deletion"""
+        with self.lock:
+            try:
+                data = self._read_data()
+                chat_key = str(chat_id)
+                
+                if chat_key in data and 'message_ids' in data[chat_key]:
+                    if message_id not in data[chat_key]['message_ids']:
+                        data[chat_key]['message_ids'].append(message_id)
+                        self._write_data(data)
+                        logger.debug(f"Added message ID {message_id} to track for chat {chat_id}")
+            except Exception as e:
+                logger.error(f"Error adding message ID {message_id} for chat {chat_id}: {e}")
+    
+    def get_tracked_message_ids(self, chat_id: int) -> List[int]:
+        """Get all tracked message IDs for a chat"""
+        try:
+            quiz_state = self.load_quiz_state(chat_id)
+            if quiz_state and 'message_ids' in quiz_state:
+                return quiz_state['message_ids']
+            return []
+        except Exception as e:
+            logger.error(f"Error getting tracked message IDs for chat {chat_id}: {e}")
+            return []
+    
+    def clear_tracked_message_ids(self, chat_id: int) -> None:
+        """Clear tracked message IDs for a chat"""
+        with self.lock:
+            try:
+                data = self._read_data()
+                chat_key = str(chat_id)
+                
+                if chat_key in data and 'message_ids' in data[chat_key]:
+                    data[chat_key]['message_ids'] = []
+                    self._write_data(data)
+                    logger.debug(f"Cleared tracked message IDs for chat {chat_id}")
+            except Exception as e:
+                logger.error(f"Error clearing tracked message IDs for chat {chat_id}: {e}")
     
     def validate_quiz_state(self, quiz_state: dict) -> bool:
         """Validate quiz state structure and data integrity"""
@@ -703,38 +699,6 @@ class QuizStateManager:
                 except OSError:
                     pass
             raise
-    
-    def record_quiz_win(self, winner_user_id: int, winner_username: str, quiz_info: Dict[str, Any], participant_count: int) -> None:
-        """Record a quiz win in the persistent leaderboard (only if multiple participants)"""
-        if participant_count < 2:
-            logger.debug(f"Not recording quiz win - only {participant_count} participant(s)")
-            return
-        
-        with self.lock:
-            try:
-                data = self._read_leaderboard_data()
-                user_key = str(winner_user_id)
-                
-                if user_key not in data:
-                    data[user_key] = {
-                        'username': winner_username,
-                        'wins': 0,
-                        'total_points': 0,
-                        'quizzes_participated': 0,
-                        'last_win_date': None
-                    }
-                
-                # Update win statistics
-                data[user_key]['wins'] += 1
-                data[user_key]['username'] = winner_username  # Update username in case it changed
-                data[user_key]['total_points'] += quiz_info.get('winner_points', 0)
-                data[user_key]['last_win_date'] = datetime.now().isoformat()
-                
-                self._write_leaderboard_data(data)
-                logger.info(f"Recorded quiz win for {winner_username} ({winner_user_id})")
-            except Exception as e:
-                logger.error(f"Failed to record quiz win: {e}")
-                raise
     
     def update_participation_stats(self, participants: Dict[str, Dict[str, Any]]) -> None:
         """Update participation statistics for all quiz participants"""

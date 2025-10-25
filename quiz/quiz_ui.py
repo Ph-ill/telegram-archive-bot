@@ -54,8 +54,21 @@ class QuizUI:
             )
             
             if response and 'message_id' in response:
-                logger.debug(f"Question {question_num} sent to chat {chat_id}, message_id: {response['message_id']}")
-                return response['message_id']
+                message_id = response['message_id']
+                logger.debug(f"Question {question_num} sent to chat {chat_id}, message_id: {message_id}")
+                
+                # Track message ID for later deletion
+                try:
+                    from .state_manager import QuizStateManager
+                    import os
+                    data_dir = '/app/data' if os.path.exists('/app/data') else '/app'
+                    quiz_data_path = os.path.join(data_dir, 'quiz_data.json')
+                    state_manager = QuizStateManager(quiz_data_path)
+                    state_manager.add_message_id(chat_id, message_id)
+                except Exception as e:
+                    logger.warning(f"Failed to track message ID {message_id}: {e}")
+                
+                return message_id
             else:
                 logger.warning(f"Failed to send question {question_num} to chat {chat_id}")
                 return None
@@ -232,8 +245,21 @@ class QuizUI:
             )
             
             if response and 'message_id' in response:
-                logger.debug(f"Quiz progress sent to chat {chat_id}, message_id: {response['message_id']}")
-                return response['message_id']
+                message_id = response['message_id']
+                logger.debug(f"Quiz progress sent to chat {chat_id}, message_id: {message_id}")
+                
+                # Track message ID for later deletion
+                try:
+                    from .state_manager import QuizStateManager
+                    import os
+                    data_dir = '/app/data' if os.path.exists('/app/data') else '/app'
+                    quiz_data_path = os.path.join(data_dir, 'quiz_data.json')
+                    state_manager = QuizStateManager(quiz_data_path)
+                    state_manager.add_message_id(chat_id, message_id)
+                except Exception as e:
+                    logger.warning(f"Failed to track message ID {message_id}: {e}")
+                
+                return message_id
             else:
                 logger.warning(f"Failed to send quiz progress to chat {chat_id}")
                 return None
@@ -461,45 +487,80 @@ class QuizUI:
         return f"✅ {message}"
     
     def send_final_results(self, chat_id: int, leaderboard_data: List[Dict[str, Any]], 
-                          quiz_info: Dict[str, Any], last_result: str) -> Optional[int]:
+                          quiz_info: Dict[str, Any], last_result: str = None) -> Optional[int]:
         """
-        Send final quiz results with last question result
+        Send final quiz results with winner announcement
         
         Args:
             chat_id: Telegram chat ID
             leaderboard_data: Final leaderboard data
             quiz_info: Quiz information
-            last_result: Result from the last question
+            last_result: Result from the last question (optional)
             
         Returns:
             Message ID of sent message, or None if failed
         """
         try:
-            message = f"{last_result}\n\n"
+            message = ""
+            
+            # Add last result if provided
+            if last_result:
+                message += f"{last_result}\n\n"
+            
             message += "🏁 **Quiz Complete!**\n\n"
             
-            if leaderboard_data:
+            if leaderboard_data and len(leaderboard_data) > 0:
                 winner = leaderboard_data[0]
-                if len(leaderboard_data) > 1 and winner['points'] > 0:
-                    message += f"🏆 **Winner:** {winner['username']} ({winner['points']} points)\n\n"
+                winner_points = winner.get('points', 0)
                 
-                # Show top 3 only for conciseness
-                for i, player in enumerate(leaderboard_data[:3]):
+                # Show winner announcement if there's a clear winner with points
+                if winner_points > 0:
+                    if len(leaderboard_data) > 1:
+                        # Multiple participants - show winner
+                        message += f"🎉 **WINNER: {winner['username']}!** 🎉\n"
+                        message += f"🏆 Final Score: {winner_points} points\n\n"
+                        
+                        # Check if there's a tie for first place
+                        tied_winners = [p for p in leaderboard_data if p.get('points', 0) == winner_points]
+                        if len(tied_winners) > 1:
+                            tied_names = [p['username'] for p in tied_winners]
+                            message = message.replace("WINNER:", "TIE FOR FIRST:")
+                            message = message.replace(f"{winner['username']}!", f"{', '.join(tied_names)}!")
+                    else:
+                        # Solo player
+                        message += f"🎯 **Solo Victory: {winner['username']}!**\n"
+                        message += f"📊 Final Score: {winner_points} points\n\n"
+                
+                # Show final leaderboard (top 5)
+                message += "📊 **Final Leaderboard:**\n"
+                medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+                
+                for i, player in enumerate(leaderboard_data[:5]):
                     rank = i + 1
                     username = player.get('username', 'Unknown')
                     points = player.get('points', 0)
                     
-                    if rank == 1:
-                        message += f"🥇 {username} - {points} points\n"
-                    elif rank == 2:
-                        message += f"🥈 {username} - {points} points\n"
-                    elif rank == 3:
-                        message += f"🥉 {username} - {points} points\n"
+                    if rank <= len(medals):
+                        medal = medals[rank - 1]
+                        message += f"{medal} {username} - {points} points\n"
+                    else:
+                        message += f"{rank}. {username} - {points} points\n"
                 
-                if len(leaderboard_data) > 3:
-                    message += f"... and {len(leaderboard_data) - 3} more players"
+                if len(leaderboard_data) > 5:
+                    message += f"... and {len(leaderboard_data) - 5} more players\n"
+                    
             else:
-                message += "No participants scored points."
+                message += "🤷‍♂️ No participants scored points.\n"
+            
+            # Add quiz info
+            subject = quiz_info.get('subject', 'Unknown')
+            difficulty = quiz_info.get('difficulty', 'medium')
+            total_questions = quiz_info.get('total_questions', 0)
+            
+            message += f"\n📚 **Quiz:** {subject} ({difficulty.title()})\n"
+            message += f"❓ **Questions:** {total_questions}\n"
+            message += f"👥 **Participants:** {len(leaderboard_data) if leaderboard_data else 0}\n"
+            message += "\n🎉 Thanks for playing! Use /quiz_new to start another quiz!"
             
             response = self.bot_instance.send_message(
                 chat_id=chat_id,
@@ -508,7 +569,7 @@ class QuizUI:
             )
             
             if response and 'message_id' in response:
-                logger.debug(f"Final results sent to chat {chat_id}")
+                logger.info(f"Final results with winner announcement sent to chat {chat_id}")
                 return response['message_id']
             else:
                 logger.warning(f"Failed to send final results to chat {chat_id}")
@@ -517,3 +578,31 @@ class QuizUI:
         except Exception as e:
             logger.error(f"Error sending final results to chat {chat_id}: {e}")
             return None
+    
+    def delete_quiz_messages(self, chat_id: int, message_ids: List[int]) -> int:
+        """
+        Delete quiz-related messages (questions, progress, etc.)
+        
+        Args:
+            chat_id: Telegram chat ID
+            message_ids: List of message IDs to delete
+            
+        Returns:
+            Number of messages successfully deleted
+        """
+        deleted_count = 0
+        
+        for message_id in message_ids:
+            try:
+                success = self.bot_instance.delete_message(chat_id, message_id)
+                if success:
+                    deleted_count += 1
+                    logger.debug(f"Deleted message {message_id} from chat {chat_id}")
+                else:
+                    logger.warning(f"Failed to delete message {message_id} from chat {chat_id}")
+            except Exception as e:
+                logger.warning(f"Error deleting message {message_id} from chat {chat_id}: {e}")
+                continue
+        
+        logger.info(f"Deleted {deleted_count}/{len(message_ids)} quiz messages from chat {chat_id}")
+        return deleted_count

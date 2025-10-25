@@ -2026,18 +2026,37 @@ class SeleniumArchiveBot:
     
     def handle_quiz_stop_command(self, chat_id):
         """Handle /quiz_stop command"""
-        result = self.quiz_manager.stop_quiz(chat_id)
-        
-        if result['success']:
-            from quiz.quiz_ui import QuizUI
-            quiz_ui = QuizUI(self)
-            if result['final_leaderboard']:
-                quiz_ui.send_leaderboard(chat_id, result['final_leaderboard'], result['quiz_info'], is_final=True)
-            return "🏁 Quiz stopped successfully!"
-        else:
-            from quiz.quiz_ui import QuizUI
-            quiz_ui = QuizUI(self)
-            return quiz_ui.format_error_message(result['error_type'], result['error'])
+        try:
+            # Get tracked message IDs before stopping quiz
+            from quiz.state_manager import QuizStateManager
+            quiz_data_path = os.path.join(self.data_dir, 'quiz_data.json')
+            state_manager = QuizStateManager(quiz_data_path)
+            tracked_messages = state_manager.get_tracked_message_ids(chat_id)
+            
+            result = self.quiz_manager.stop_quiz(chat_id)
+            
+            if result['success']:
+                from quiz.quiz_ui import QuizUI
+                quiz_ui = QuizUI(self)
+                
+                # Send final results with winner announcement
+                if result['final_leaderboard']:
+                    quiz_ui.send_final_results(chat_id, result['final_leaderboard'], result['quiz_info'])
+                
+                # Delete previous quiz messages
+                if tracked_messages:
+                    deleted_count = quiz_ui.delete_quiz_messages(chat_id, tracked_messages)
+                    logger.info(f"Deleted {deleted_count} quiz messages from chat {chat_id}")
+                
+                return None  # Don't send additional text since final results were sent
+            else:
+                from quiz.quiz_ui import QuizUI
+                quiz_ui = QuizUI(self)
+                return quiz_ui.format_error_message(result['error_type'], result['error'])
+                
+        except Exception as e:
+            logger.error(f"Error in handle_quiz_stop_command for chat {chat_id}: {e}")
+            return "💥 **Error:** Failed to stop quiz."
     
     def handle_admin_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
         """Handle admin-only commands"""
@@ -2173,6 +2192,67 @@ class SeleniumArchiveBot:
             logger.error(f"Error sending message: {e}")
             return False
     
+    def delete_message(self, chat_id, message_id):
+        """Delete message via Telegram Bot API"""
+        try:
+            import requests
+            url = f"{self.telegram_api_url}/deleteMessage"
+            data = {
+                'chat_id': chat_id,
+                'message_id': message_id
+            }
+            
+            response = requests.post(url, json=data, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('ok'):
+                    logger.debug(f"Message {message_id} deleted successfully from chat {chat_id}")
+                    return True
+                else:
+                    logger.warning(f"Failed to delete message {message_id}: {result.get('description', 'Unknown error')}")
+                    return False
+            else:
+                logger.error(f"Failed to delete message {message_id}: {response.text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error deleting message {message_id}: {e}")
+            return False
+    
+    def edit_message_text(self, chat_id, message_id, text, parse_mode=None, reply_markup=None):
+        """Edit message text via Telegram Bot API"""
+        try:
+            import requests
+            url = f"{self.telegram_api_url}/editMessageText"
+            data = {
+                'chat_id': chat_id,
+                'message_id': message_id,
+                'text': text,
+                'parse_mode': parse_mode or 'HTML'
+            }
+            
+            if reply_markup:
+                data['reply_markup'] = reply_markup
+            
+            response = requests.post(url, json=data, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('ok'):
+                    logger.debug(f"Message {message_id} edited successfully in chat {chat_id}")
+                    return result.get('result', True)
+                else:
+                    logger.warning(f"Failed to edit message {message_id}: {result.get('description', 'Unknown error')}")
+                    return False
+            else:
+                logger.error(f"Failed to edit message {message_id}: {response.text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error editing message {message_id}: {e}")
+            return False
+    
     def process_webhook_update(self, update):
         """Process incoming webhook update"""
         try:
@@ -2285,11 +2365,22 @@ class SeleniumArchiveBot:
                 
                 # Check if quiz is complete or send next question
                 if result.get('quiz_complete'):
+                    # Get tracked message IDs before sending final results
+                    from quiz.state_manager import QuizStateManager
+                    quiz_data_path = os.path.join(self.data_dir, 'quiz_data.json')
+                    state_manager = QuizStateManager(quiz_data_path)
+                    tracked_messages = state_manager.get_tracked_message_ids(chat_id)
+                    
                     # Send final results with last question result
                     final_leaderboard = result.get('final_leaderboard', {})
                     if final_leaderboard.get('success'):
                         quiz_ui.send_final_results(chat_id, final_leaderboard['leaderboard'], 
                                                  final_leaderboard['quiz_info'], result_text)
+                        
+                        # Delete previous quiz messages
+                        if tracked_messages:
+                            deleted_count = quiz_ui.delete_quiz_messages(chat_id, tracked_messages)
+                            logger.info(f"Quiz completed - deleted {deleted_count} messages from chat {chat_id}")
                 elif result.get('next_question'):
                     # Send next question with previous result
                     next_question = result['next_question']
