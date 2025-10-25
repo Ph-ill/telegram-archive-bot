@@ -58,8 +58,10 @@ class SeleniumArchiveBot:
         if not self.webhook_url:
             raise ValueError("WEBHOOK_URL environment variable is required")
         
-        self.bot_username = "Angel_Dimi_Bot"
         self.telegram_api_url = f"https://api.telegram.org/bot{self.bot_token}"
+        
+        # Get bot username dynamically from Telegram API
+        self.bot_username = self.get_bot_username()
         
         # Use persistent storage if available
         self.data_dir = '/app/data' if os.path.exists('/app/data') else '/app'
@@ -74,10 +76,31 @@ class SeleniumArchiveBot:
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
         
-        logger.info(f"Bot initialized - Token: {self.bot_token[:10]}..., Webhook: {self.webhook_url}")
+        logger.info(f"Bot initialized - Username: @{self.bot_username}, Token: {self.bot_token[:10]}..., Webhook: {self.webhook_url}")
         
         # Start birthday monitoring system
         self.start_birthday_monitor()
+    
+    def get_bot_username(self):
+        """Get bot username from Telegram API"""
+        try:
+            import requests
+            url = f"{self.telegram_api_url}/getMe"
+            response = requests.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('ok'):
+                    username = data['result'].get('username', 'Unknown_Bot')
+                    logger.info(f"Bot username retrieved: @{username}")
+                    return username
+            
+            logger.warning("Failed to get bot username from API, using fallback")
+            return "Angel_Dimi_Bot"  # Fallback
+            
+        except Exception as e:
+            logger.error(f"Error getting bot username: {e}")
+            return "Angel_Dimi_Bot"  # Fallback
     
     def signal_handler(self, signum, frame):
         """Handle graceful shutdown"""
@@ -185,7 +208,7 @@ class SeleniumArchiveBot:
             # Use sender's username or ID as fallback
             username = sender_username or f"user_{sender_id}"
         else:
-            return None, "Invalid format. Use:\n@Angel_Dimi_Bot birthday set YYYY-MM-DD Timezone [username]\n\nExamples:\n• @Angel_Dimi_Bot birthday set 1990-03-15 America/New_York (uses your username/ID)\n• @Angel_Dimi_Bot birthday set 1990-03-15 America/New_York john (sets for specific user)"
+            return None, f"<blockquote expandable>Invalid format. Use:\n@{self.bot_username} birthday set YYYY-MM-DD Timezone [username]\n\nExamples:\n• @{self.bot_username} birthday set 1990-03-15 America/New_York (uses your username/ID)\n• @{self.bot_username} birthday set 1990-03-15 America/New_York john (sets for specific user)</blockquote>"
         
         # Validate date format
         try:
@@ -451,9 +474,9 @@ class SeleniumArchiveBot:
             age = self.calculate_age(birthday_data['date'])
             
             if auth_type == "self":
-                return f"@{sender_name} ✅ Your birthday has been saved!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}"
+                return f"@{sender_name} <blockquote expandable>✅ Your birthday has been saved!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}</blockquote>"
             else:
-                return f"@{sender_name} ✅ Birthday saved for @{target_username}!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}"
+                return f"@{sender_name} <blockquote expandable>✅ Birthday saved for @{target_username}!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}</blockquote>"
         
         elif "delete_birthday" in text.lower():
             # Only special users can delete birthdays
@@ -464,7 +487,7 @@ class SeleniumArchiveBot:
             # Parse delete command
             delete_result = self.parse_delete_birthday_command(text)
             if delete_result is None:
-                return f"@{sender_name} Invalid format. Use: @Angel_Dimi_Bot delete_birthday @username\nExample: @Angel_Dimi_Bot delete_birthday @john"
+                return f"@{sender_name} Invalid format. Use: @{self.bot_username} delete_birthday @username\nExample: @{self.bot_username} delete_birthday @john"
             
             username_to_delete = delete_result
             
@@ -483,7 +506,7 @@ class SeleniumArchiveBot:
             del birthdays[username_to_delete]
             self.save_birthdays(birthdays)
             
-            return f"@{sender_name} ✅ Birthday deleted for @{username_to_delete}!\nDeleted data:\nBirthday: {existing['date']}\nTimezone: {existing['timezone']}\nAge: {existing_age}"
+            return f"@{sender_name} <blockquote expandable>✅ Birthday deleted for @{username_to_delete}!\nDeleted data:\nBirthday: {existing['date']}\nTimezone: {existing['timezone']}\nAge: {existing_age}</blockquote>"
         
         elif "list_birthdays" in text.lower():
             # Only special users can list all birthdays
@@ -572,7 +595,7 @@ class SeleniumArchiveBot:
             return f"@{sender_name} ✅ User-specific birthday message added for @{target_user}!\nMessage: {message_template}"
         
         else:
-            return f"@{sender_name} Invalid format. Use:\n• @Angel_Dimi_Bot add_birthday_message random \"Your message with {{username}} and {{age}}\"\n• @Angel_Dimi_Bot add_birthday_message user username \"User-specific message with {{username}} and {{age}}\"\n\nNote: Use {{username}} and {{age}} as placeholders in your message."
+            return f"@{sender_name} <blockquote expandable>Invalid format. Use:\n• @{self.bot_username} add_birthday_message random \"Your message with {{username}} and {{age}}\"\n• @{self.bot_username} add_birthday_message user username \"User-specific message with {{username}} and {{age}}\"\n\nNote: Use {{username}} and {{age}} as placeholders in your message.</blockquote>"
     
     def process_list_birthday_messages(self, sender_name, sender_username):
         """Process list birthday messages command"""
@@ -655,58 +678,59 @@ class SeleniumArchiveBot:
                 return f"@{sender_name} ❌ No user-specific message found for @{target_user}."
         
         else:
-            return f"@{sender_name} Invalid format. Use:\n• @Angel_Dimi_Bot delete_birthday_message random [number]\n• @Angel_Dimi_Bot delete_birthday_message user [username]\n\nUse list_birthday_messages to see available messages."
+            return f"@{sender_name} <blockquote expandable>Invalid format. Use:\n• @{self.bot_username} delete_birthday_message random [number]\n• @{self.bot_username} delete_birthday_message user [username]\n\nUse list_birthday_messages to see available messages.</blockquote>"
     
     def get_help_message(self, sender_name, sender_username):
         """Generate help message with available commands"""
         special_users = ["racistwaluigi", "kokorozasu"]
         is_special_user = sender_username.lower() in special_users
+        bot_mention = f"@{self.bot_username}"
         
-        help_text = f"🤖 Angel Dimi Bot Commands:\n\n<blockquote expandable>"
+        help_text = f"🤖 {self.bot_username} Commands:\n\n<blockquote expandable>"
         
         # Archive commands (available to everyone)
         help_text += "📁 Archive Commands:\n"
-        help_text += "• /archive@Angel_Dimi_Bot &lt;URL&gt; - Archive a link\n"
-        help_text += "  Example: /archive@Angel_Dimi_Bot https://example.com\n\n"
+        help_text += f"• /archive{bot_mention} &lt;URL&gt; - Archive a link\n"
+        help_text += f"  Example: /archive{bot_mention} https://example.com\n\n"
         
         # Birthday commands (available to everyone for self)
         help_text += "🎂 Birthday Commands:\n"
-        help_text += "• /birthday_set@Angel_Dimi_Bot &lt;YYYY-MM-DD&gt; &lt;Timezone&gt; [username] - Set birthday\n"
-        help_text += "  Example: /birthday_set@Angel_Dimi_Bot 1990-03-15 America/New_York\n\n"
+        help_text += f"• /birthday_set{bot_mention} &lt;YYYY-MM-DD&gt; &lt;Timezone&gt; [username] - Set birthday\n"
+        help_text += f"  Example: /birthday_set{bot_mention} 1990-03-15 America/New_York\n\n"
         
         # Fun commands
         help_text += "🎯 Activity &amp; Fun Commands:\n"
-        help_text += "• /layla@Angel_Dimi_Bot - Send a random Layla image\n"
-        help_text += "• /bored@Angel_Dimi_Bot - Get a random activity suggestion\n"
-        help_text += "• /bored_type@Angel_Dimi_Bot &lt;type&gt; - Get activity by type\n"
+        help_text += f"• /layla{bot_mention} - Send a random Layla image\n"
+        help_text += f"• /bored{bot_mention} - Get a random activity suggestion\n"
+        help_text += f"• /bored_type{bot_mention} &lt;type&gt; - Get activity by type\n"
         help_text += "  Types: education, social, recreational, diy, charity, cooking, relaxation, music, busywork\n"
-        help_text += "• /bored_participants@Angel_Dimi_Bot &lt;number&gt; - Get activity for specific number of people\n"
-        help_text += "• /bored_price@Angel_Dimi_Bot &lt;range&gt; - Get activity by cost (free, low, medium, high)\n"
-        help_text += "• /age_guess@Angel_Dimi_Bot &lt;name&gt; - Predict someone's age based on their name\n"
-        help_text += "  Example: /age_guess@Angel_Dimi_Bot John\n"
-        help_text += "• /xkcd_latest@Angel_Dimi_Bot - Get the latest XKCD comic\n"
-        help_text += "• /xkcd_random@Angel_Dimi_Bot - Get a random XKCD comic\n"
-        help_text += "• /xkcd_number@Angel_Dimi_Bot &lt;number&gt; - Get a specific XKCD comic\n"
-        help_text += "  Example: /xkcd_number@Angel_Dimi_Bot 353\n"
-        help_text += "• /iss@Angel_Dimi_Bot - Get current location and crew of the International Space Station\n\n"
+        help_text += f"• /bored_participants{bot_mention} &lt;number&gt; - Get activity for specific number of people\n"
+        help_text += f"• /bored_price{bot_mention} &lt;range&gt; - Get activity by cost (free, low, medium, high)\n"
+        help_text += f"• /age_guess{bot_mention} &lt;name&gt; - Predict someone's age based on their name\n"
+        help_text += f"  Example: /age_guess{bot_mention} John\n"
+        help_text += f"• /xkcd_latest{bot_mention} - Get the latest XKCD comic\n"
+        help_text += f"• /xkcd_random{bot_mention} - Get a random XKCD comic\n"
+        help_text += f"• /xkcd_number{bot_mention} &lt;number&gt; - Get a specific XKCD comic\n"
+        help_text += f"  Example: /xkcd_number{bot_mention} 353\n"
+        help_text += f"• /iss{bot_mention} - Get current location and crew of the International Space Station\n\n"
         
         # Special user commands
         if is_special_user:
             help_text += "👑 Admin Commands (Special Users Only):\n"
-            help_text += "• /test_birthday@Angel_Dimi_Bot - Send test birthday message\n"
-            help_text += "• /delete_birthday@Angel_Dimi_Bot &lt;username&gt; - Delete a birthday\n"
-            help_text += "• /list_birthdays@Angel_Dimi_Bot - List all stored birthdays\n"
-            help_text += "• /add_birthday_message@Angel_Dimi_Bot random \"message\" - Add random birthday message\n"
-            help_text += "• /add_birthday_message@Angel_Dimi_Bot user &lt;username&gt; \"message\" - Add user-specific message\n"
-            help_text += "• /list_birthday_messages@Angel_Dimi_Bot - View all birthday messages\n"
-            help_text += "• /delete_birthday_message@Angel_Dimi_Bot random &lt;number&gt; - Delete random message\n"
-            help_text += "• /delete_birthday_message@Angel_Dimi_Bot user &lt;username&gt; - Delete user message\n"
+            help_text += f"• /test_birthday{bot_mention} - Send test birthday message\n"
+            help_text += f"• /delete_birthday{bot_mention} &lt;username&gt; - Delete a birthday\n"
+            help_text += f"• /list_birthdays{bot_mention} - List all stored birthdays\n"
+            help_text += f"• /add_birthday_message{bot_mention} random \"message\" - Add random birthday message\n"
+            help_text += f"• /add_birthday_message{bot_mention} user &lt;username&gt; \"message\" - Add user-specific message\n"
+            help_text += f"• /list_birthday_messages{bot_mention} - View all birthday messages\n"
+            help_text += f"• /delete_birthday_message{bot_mention} random &lt;number&gt; - Delete random message\n"
+            help_text += f"• /delete_birthday_message{bot_mention} user &lt;username&gt; - Delete user message\n"
             help_text += "• Can set birthdays for any user\n\n"
         
         # Additional info
         help_text += "📝 Notes:\n"
-        help_text += "• In group chats: Use @Angel_Dimi_Bot (e.g., /help@Angel_Dimi_Bot)\n"
-        help_text += "• In private chats: @Angel_Dimi_Bot is optional (e.g., /help works)\n"
+        help_text += f"• In group chats: Use {bot_mention} (e.g., /help{bot_mention})\n"
+        help_text += f"• In private chats: {bot_mention} is optional (e.g., /help works)\n"
         help_text += "• Use / to see all available commands in your chat\n"
         help_text += "• Birthday alerts sent to group at midnight in your timezone\n"
         help_text += "• Timezone list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
@@ -962,7 +986,7 @@ class SeleniumArchiveBot:
     def handle_birthday_set_command(self, args, sender_name, sender_username, sender_id):
         """Handle /birthday_set command"""
         if not args.strip():
-            return "Please provide birthday information.\nFormat: /birthday_set YYYY-MM-DD Timezone [username]\nExample: /birthday_set 1990-03-15 America/New_York"
+            return "<blockquote expandable>Please provide birthday information.\nFormat: /birthday_set YYYY-MM-DD Timezone [username]\nExample: /birthday_set 1990-03-15 America/New_York</blockquote>"
         
         # Parse the birthday command using existing logic
         fake_text = f"birthday set {args}"  # Convert to old format for parsing
@@ -995,9 +1019,9 @@ class SeleniumArchiveBot:
         age = self.calculate_age(birthday_data['date'])
         
         if auth_type == "self":
-            return f"✅ Your birthday has been saved!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}"
+            return f"<blockquote expandable>✅ Your birthday has been saved!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}</blockquote>"
         else:
-            return f"✅ Birthday saved for @{target_username}!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}"
+            return f"<blockquote expandable>✅ Birthday saved for @{target_username}!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}</blockquote>"
     
     def handle_layla_command(self, chat_id):
         """Handle /layla command - send random image from layla_images folder"""
@@ -1065,11 +1089,11 @@ class SeleniumArchiveBot:
                 else:
                     price_desc = "High cost"
                 
-                return f"🎯 <b>Random Activity Suggestion:</b>\n\n" \
+                return f"<blockquote expandable>🎯 <b>Random Activity Suggestion:</b>\n\n" \
                        f"<b>Activity:</b> {activity}\n" \
                        f"<b>Type:</b> {activity_type}\n" \
                        f"<b>Participants:</b> {participants}\n" \
-                       f"<b>Cost:</b> {price_desc}"
+                       f"<b>Cost:</b> {price_desc}</blockquote>"
             else:
                 return "❌ Failed to get activity suggestion. Please try again later."
                 
@@ -1080,7 +1104,7 @@ class SeleniumArchiveBot:
     def handle_bored_type_command(self, args):
         """Handle /bored_type command - get activity by type"""
         if not args.strip():
-            return "Please specify an activity type.\n\n" \
+            return "<blockquote expandable>Please specify an activity type.\n\n" \
                    "<b>Available types:</b>\n" \
                    "• education - Learn something new\n" \
                    "• recreational - Fun and games\n" \
@@ -1091,14 +1115,14 @@ class SeleniumArchiveBot:
                    "• relaxation - Chill and unwind\n" \
                    "• music - Musical activities\n" \
                    "• busywork - Productive tasks\n\n" \
-                   "<b>Example:</b> /bored_type social"
+                   "<b>Example:</b> /bored_type social</blockquote>"
         
         activity_type = args.strip().lower()
         valid_types = ['education', 'recreational', 'social', 'diy', 'charity', 'cooking', 'relaxation', 'music', 'busywork']
         
         if activity_type not in valid_types:
-            return f"❌ Invalid activity type '{activity_type}'.\n\n" \
-                   f"Valid types: {', '.join(valid_types)}"
+            return f"<blockquote expandable>❌ Invalid activity type '{activity_type}'.\n\n" \
+                   f"Valid types: {', '.join(valid_types)}</blockquote>"
         
         try:
             import requests
@@ -1121,10 +1145,10 @@ class SeleniumArchiveBot:
                 else:
                     price_desc = "High cost"
                 
-                return f"🎯 <b>{activity_type.title()} Activity:</b>\n\n" \
+                return f"<blockquote expandable>🎯 <b>{activity_type.title()} Activity:</b>\n\n" \
                        f"<b>Activity:</b> {activity}\n" \
                        f"<b>Participants:</b> {participants}\n" \
-                       f"<b>Cost:</b> {price_desc}"
+                       f"<b>Cost:</b> {price_desc}</blockquote>"
             else:
                 return f"❌ No {activity_type} activities found. Please try again."
                 
@@ -1135,12 +1159,12 @@ class SeleniumArchiveBot:
     def handle_bored_participants_command(self, args):
         """Handle /bored_participants command - get activity by number of participants"""
         if not args.strip():
-            return "Please specify the number of participants.\n\n" \
+            return "<blockquote expandable>Please specify the number of participants.\n\n" \
                    "<b>Examples:</b>\n" \
                    "• /bored_participants 1 - Solo activities\n" \
                    "• /bored_participants 2 - Activities for two people\n" \
                    "• /bored_participants 4 - Group activities\n\n" \
-                   "<b>Note:</b> You can specify any number from 1 to 8"
+                   "<b>Note:</b> You can specify any number from 1 to 8</blockquote>"
         
         try:
             participants = int(args.strip())
@@ -1172,10 +1196,10 @@ class SeleniumArchiveBot:
                 
                 participant_text = "person" if participants == 1 else "people"
                 
-                return f"🎯 <b>Activity for {participants} {participant_text}:</b>\n\n" \
+                return f"<blockquote expandable>🎯 <b>Activity for {participants} {participant_text}:</b>\n\n" \
                        f"<b>Activity:</b> {activity}\n" \
                        f"<b>Type:</b> {activity_type}\n" \
-                       f"<b>Cost:</b> {price_desc}"
+                       f"<b>Cost:</b> {price_desc}</blockquote>"
             else:
                 return f"❌ No activities found for {participants} participants. Please try a different number."
                 
@@ -1186,13 +1210,13 @@ class SeleniumArchiveBot:
     def handle_bored_price_command(self, args):
         """Handle /bored_price command - get activity by price range"""
         if not args.strip():
-            return "Please specify a price range.\n\n" \
+            return "<blockquote expandable>Please specify a price range.\n\n" \
                    "<b>Available price ranges:</b>\n" \
                    "• free - Completely free activities\n" \
                    "• low - Low cost activities\n" \
                    "• medium - Medium cost activities\n" \
                    "• high - Higher cost activities\n\n" \
-                   "<b>Example:</b> /bored_price free"
+                   "<b>Example:</b> /bored_price free</blockquote>"
         
         price_range = args.strip().lower()
         
@@ -1205,8 +1229,8 @@ class SeleniumArchiveBot:
         }
         
         if price_range not in price_mapping:
-            return f"❌ Invalid price range '{price_range}'.\n\n" \
-                   f"Valid ranges: {', '.join(price_mapping.keys())}"
+            return f"<blockquote expandable>❌ Invalid price range '{price_range}'.\n\n" \
+                   f"Valid ranges: {', '.join(price_mapping.keys())}</blockquote>"
         
         min_price, max_price = price_mapping[price_range]
         
@@ -1221,10 +1245,10 @@ class SeleniumArchiveBot:
                 activity_type = data.get('type', 'Unknown').title()
                 participants = data.get('participants', 'Unknown')
                 
-                return f"🎯 <b>{price_range.title()} Cost Activity:</b>\n\n" \
+                return f"<blockquote expandable>🎯 <b>{price_range.title()} Cost Activity:</b>\n\n" \
                        f"<b>Activity:</b> {activity}\n" \
                        f"<b>Type:</b> {activity_type}\n" \
-                       f"<b>Participants:</b> {participants}"
+                       f"<b>Participants:</b> {participants}</blockquote>"
             else:
                 return f"❌ No {price_range} cost activities found. Please try again."
                 
@@ -1235,12 +1259,12 @@ class SeleniumArchiveBot:
     def handle_age_guess_command(self, args):
         """Handle /age_guess command - predict age based on name using Agify API"""
         if not args.strip():
-            return "Please provide a name to guess the age for.\n\n" \
+            return "<blockquote expandable>Please provide a name to guess the age for.\n\n" \
                    "<b>Examples:</b>\n" \
                    "• /age_guess John\n" \
                    "• /age_guess Sarah\n" \
                    "• /age_guess Michael\n\n" \
-                   "<b>Note:</b> This uses statistical data and may not be accurate for individuals."
+                   "<b>Note:</b> This uses statistical data and may not be accurate for individuals.</blockquote>"
         
         name = args.strip().title()  # Capitalize first letter for better display
         
@@ -1265,9 +1289,9 @@ class SeleniumArchiveBot:
                 count = data.get('count', 0)
                 
                 if predicted_age is None:
-                    return f"🤔 <b>Age Prediction for {name}:</b>\n\n" \
+                    return f"<blockquote expandable>🤔 <b>Age Prediction for {name}:</b>\n\n" \
                            f"❌ Sorry, I couldn't find enough data to predict the age for the name '{name}'.\n\n" \
-                           f"This might happen with very rare or unique names."
+                           f"This might happen with very rare or unique names.</blockquote>"
                 
                 # Add confidence indicator based on count
                 if count < 100:
@@ -1292,12 +1316,12 @@ class SeleniumArchiveBot:
                 else:
                     age_group = "Senior"
                 
-                return f"🎯 <b>Age Prediction for {name}:</b>\n\n" \
+                return f"<blockquote expandable>🎯 <b>Age Prediction for {name}:</b>\n\n" \
                        f"<b>Predicted Age:</b> {predicted_age} years old\n" \
                        f"<b>Age Group:</b> {age_group}\n" \
                        f"<b>Confidence:</b> {confidence_emoji} {confidence}\n" \
                        f"<b>Based on:</b> {count:,} data points\n\n" \
-                       f"<i>💡 This is based on statistical data from people with this name and may not reflect individual cases.</i>"
+                       f"<i>💡 This is based on statistical data from people with this name and may not reflect individual cases.</i></blockquote>"
             
             elif response.status_code == 429:
                 return "❌ Too many requests. Please wait a moment and try again."
@@ -1358,12 +1382,12 @@ class SeleniumArchiveBot:
     def handle_xkcd_number_command(self, args, chat_id):
         """Handle /xkcd_number command - get a specific XKCD comic by number"""
         if not args.strip():
-            return "Please specify a comic number.\n\n" \
+            return "<blockquote expandable>Please specify a comic number.\n\n" \
                    "<b>Examples:</b>\n" \
-                   "• /xkcd_number@Angel_Dimi_Bot 1\n" \
-                   "• /xkcd_number@Angel_Dimi_Bot 353\n" \
-                   "• /xkcd_number@Angel_Dimi_Bot 2000\n\n" \
-                   "<b>Note:</b> Comic #404 doesn't exist (it's a joke about HTTP 404 errors)"
+                   f"• /xkcd_number@{self.bot_username} 1\n" \
+                   f"• /xkcd_number@{self.bot_username} 353\n" \
+                   f"• /xkcd_number@{self.bot_username} 2000\n\n" \
+                   "<b>Note:</b> Comic #404 doesn't exist (it's a joke about HTTP 404 errors)</blockquote>"
         
         try:
             comic_num = int(args.strip())
@@ -1374,7 +1398,7 @@ class SeleniumArchiveBot:
                 return "❌ Comic #404 doesn't exist! This is an intentional joke about HTTP 404 errors. Try a different number."
                 
         except ValueError:
-            return "❌ Please provide a valid comic number.\nExample: /xkcd_number@Angel_Dimi_Bot 353"
+            return f"❌ Please provide a valid comic number.\nExample: /xkcd_number@{self.bot_username} 353"
         
         try:
             import requests
@@ -1385,7 +1409,7 @@ class SeleniumArchiveBot:
                 data = response.json()
                 return self.send_xkcd_comic(data, chat_id)
             elif response.status_code == 404:
-                return f"❌ Comic #{comic_num} doesn't exist. Try a lower number or use /xkcd_latest@Angel_Dimi_Bot to see the highest available number."
+                return f"❌ Comic #{comic_num} doesn't exist. Try a lower number or use /xkcd_latest@{self.bot_username} to see the highest available number."
             else:
                 return "❌ Failed to get XKCD comic. Please try again later."
                 
@@ -1485,7 +1509,7 @@ class SeleniumArchiveBot:
             location_desc = self.get_location_description(latitude, longitude)
             
             # Format response
-            response = f"🛰️ <b>International Space Station Status:</b>\n\n"
+            response = f"<blockquote expandable>🛰️ <b>International Space Station Status:</b>\n\n"
             response += f"<b>Current Location:</b> {location_desc}\n"
             response += f"<b>Coordinates:</b> {latitude:.2f}°, {longitude:.2f}°\n"
             response += f"<b>Crew on ISS:</b> {iss_crew_count} people\n\n"
@@ -1503,6 +1527,8 @@ class SeleniumArchiveBot:
                 response += f"\n<i>Data updated: {dt.strftime('%H:%M:%S UTC')}</i>"
             except:
                 pass
+            
+            response += "</blockquote>"
             
             return response
             
@@ -1625,7 +1651,7 @@ class SeleniumArchiveBot:
     def handle_delete_birthday_command(self, args, sender_name):
         """Handle /delete_birthday command"""
         if not args.strip():
-            return "Please specify a username.\nFormat: /delete_birthday username\nExample: /delete_birthday john"
+            return "<blockquote expandable>Please specify a username.\nFormat: /delete_birthday username\nExample: /delete_birthday john</blockquote>"
         
         username_to_delete = args.strip().replace('@', '').lower()
         
@@ -1644,7 +1670,7 @@ class SeleniumArchiveBot:
         del birthdays[username_to_delete]
         self.save_birthdays(birthdays)
         
-        return f"✅ Birthday deleted for @{username_to_delete}!\nDeleted data:\nBirthday: {existing['date']}\nTimezone: {existing['timezone']}\nAge: {existing_age}"
+        return f"<blockquote expandable>✅ Birthday deleted for @{username_to_delete}!\nDeleted data:\nBirthday: {existing['date']}\nTimezone: {existing['timezone']}\nAge: {existing_age}</blockquote>"
     
     def handle_list_birthdays_command(self, sender_name):
         """Handle /list_birthdays command"""
@@ -1679,7 +1705,7 @@ class SeleniumArchiveBot:
     def handle_add_birthday_message_command(self, args, sender_name, sender_username):
         """Handle /add_birthday_message command"""
         if not args.strip():
-            return "Please provide message details.\nFormats:\n• /add_birthday_message random \"Your message with {username} and {age}\"\n• /add_birthday_message user username \"User-specific message\""
+            return "<blockquote expandable>Please provide message details.\nFormats:\n• /add_birthday_message random \"Your message with {username} and {age}\"\n• /add_birthday_message user username \"User-specific message\"</blockquote>"
         
         # Use existing logic from process_add_birthday_message
         fake_text = f"add_birthday_message {args}"
@@ -1692,7 +1718,7 @@ class SeleniumArchiveBot:
     def handle_delete_birthday_message_command(self, args, sender_name, sender_username):
         """Handle /delete_birthday_message command"""
         if not args.strip():
-            return "Please specify what to delete.\nFormats:\n• /delete_birthday_message random [number]\n• /delete_birthday_message user [username]"
+            return "<blockquote expandable>Please specify what to delete.\nFormats:\n• /delete_birthday_message random [number]\n• /delete_birthday_message user [username]</blockquote>"
         
         # Use existing logic from process_delete_birthday_message
         fake_text = f"delete_birthday_message {args}"
