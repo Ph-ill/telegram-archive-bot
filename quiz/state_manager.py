@@ -247,7 +247,13 @@ class QuizStateManager:
                 if chat_key in data:
                     del data[chat_key]
                     self._write_data(data)
-                    logger.debug(f"Quiz state ct[str, Any]) -> None:
+                    logger.debug(f"Quiz state cleared for chat {chat_id}")
+                else:
+                    logger.debug(f"No quiz state found for chat {chat_id}")
+            except Exception as e:
+                logger.error(f"Error clearing quiz state for chat {chat_id}: {e}")
+    
+    def _write_leaderboard_data(self, data: Dict[str, Any]) -> None:
         """Write persistent leaderboard data to JSON file atomically"""
         try:
             # Write to temporary file first for atomic operation
