@@ -1513,20 +1513,21 @@ class SeleniumArchiveBot:
     def get_location_description(self, latitude, longitude):
         """Get a human-readable description of the ISS location"""
         try:
+            # First try basic ocean/continent detection based on coordinates
+            ocean_location = self.get_ocean_by_coordinates(latitude, longitude)
+            if ocean_location:
+                return ocean_location
+            
+            # Try reverse geocoding as backup
             import requests
             
-            # Use a reverse geocoding service to get location info
-            # Using OpenStreetMap Nominatim (free, no API key required)
             url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={latitude}&lon={longitude}&zoom=3"
             headers = {'User-Agent': 'TelegramBot/1.0'}
             
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(url, headers=headers, timeout=5)
             
             if response.status_code == 200:
                 data = response.json()
-                
-                # Try to get country or ocean name
-                display_name = data.get('display_name', '')
                 address = data.get('address', {})
                 
                 # Check for country
@@ -1534,58 +1535,69 @@ class SeleniumArchiveBot:
                 if country:
                     return f"Over {country}"
                 
-                # Check for ocean/sea in display name
-                if 'ocean' in display_name.lower():
-                    if 'pacific' in display_name.lower():
-                        return "Over the Pacific Ocean"
-                    elif 'atlantic' in display_name.lower():
-                        return "Over the Atlantic Ocean"
-                    elif 'indian' in display_name.lower():
-                        return "Over the Indian Ocean"
-                    elif 'arctic' in display_name.lower():
-                        return "Over the Arctic Ocean"
-                    elif 'southern' in display_name.lower():
-                        return "Over the Southern Ocean"
-                    else:
-                        return "Over an ocean"
-                
-                # Check for sea
-                if 'sea' in display_name.lower():
-                    return "Over a sea"
-                
-                # Fallback to first part of display name
-                if display_name:
-                    parts = display_name.split(',')
-                    if len(parts) > 0:
-                        return f"Over {parts[0].strip()}"
-            
-            # Fallback to coordinate-based description
-            if latitude > 0:
-                lat_desc = f"{abs(latitude):.1f}°N"
-            else:
-                lat_desc = f"{abs(latitude):.1f}°S"
-                
-            if longitude > 0:
-                lon_desc = f"{abs(longitude):.1f}°E"
-            else:
-                lon_desc = f"{abs(longitude):.1f}°W"
-            
-            return f"At {lat_desc}, {lon_desc}"
+                # Check for state/region
+                state = address.get('state') or address.get('region')
+                if state:
+                    return f"Over {state}"
             
         except Exception as e:
             logger.error(f"Error getting location description: {e}")
-            # Fallback to basic coordinate description
-            if latitude > 0:
-                lat_desc = f"{abs(latitude):.1f}°N"
-            else:
-                lat_desc = f"{abs(latitude):.1f}°S"
-                
-            if longitude > 0:
-                lon_desc = f"{abs(longitude):.1f}°E"
-            else:
-                lon_desc = f"{abs(longitude):.1f}°W"
+        
+        # Final fallback to coordinate-based description
+        return self.get_coordinate_description(latitude, longitude)
+    
+    def get_ocean_by_coordinates(self, latitude, longitude):
+        """Determine ocean/sea based on coordinate ranges"""
+        # Pacific Ocean (largest ocean)
+        if (longitude >= -180 and longitude <= -70) or (longitude >= 120 and longitude <= 180):
+            if latitude >= -60 and latitude <= 60:
+                return "Over the Pacific Ocean"
+        
+        # Atlantic Ocean
+        if longitude >= -70 and longitude <= 20:
+            if latitude >= -60 and latitude <= 70:
+                return "Over the Atlantic Ocean"
+        
+        # Indian Ocean
+        if longitude >= 20 and longitude <= 120:
+            if latitude >= -60 and latitude <= 30:
+                return "Over the Indian Ocean"
+        
+        # Arctic Ocean
+        if latitude >= 70:
+            return "Over the Arctic Ocean"
+        
+        # Southern Ocean
+        if latitude <= -60:
+            return "Over the Southern Ocean"
+        
+        # Mediterranean Sea
+        if longitude >= -6 and longitude <= 37 and latitude >= 30 and latitude <= 47:
+            return "Over the Mediterranean Sea"
+        
+        # Caribbean Sea
+        if longitude >= -85 and longitude <= -60 and latitude >= 9 and latitude <= 22:
+            return "Over the Caribbean Sea"
+        
+        # Gulf of Mexico
+        if longitude >= -98 and longitude <= -80 and latitude >= 18 and latitude <= 31:
+            return "Over the Gulf of Mexico"
+        
+        return None
+    
+    def get_coordinate_description(self, latitude, longitude):
+        """Get basic coordinate description as fallback"""
+        if latitude > 0:
+            lat_desc = f"{abs(latitude):.1f}°N"
+        else:
+            lat_desc = f"{abs(latitude):.1f}°S"
             
-            return f"At {lat_desc}, {lon_desc}"
+        if longitude > 0:
+            lon_desc = f"{abs(longitude):.1f}°E"
+        else:
+            lon_desc = f"{abs(longitude):.1f}°W"
+        
+        return f"At {lat_desc}, {lon_desc}"
     
     def handle_admin_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
         """Handle admin-only commands"""
