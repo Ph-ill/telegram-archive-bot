@@ -19,16 +19,17 @@ class QuizUI:
     def send_question(self, chat_id: int, question_data: Dict[str, Any], question_num: int, 
                      total_questions: int, previous_result: str = None) -> Optional[int]:
         """
-        Send a quiz question with inline keyboard buttons
+        Send or edit a quiz question with inline keyboard buttons
         
         Args:
             chat_id: Telegram chat ID
             question_data: Question data with text, options, etc.
             question_num: Current question number (1-based)
             total_questions: Total number of questions in quiz
+            previous_result: Result from previous question (optional)
             
         Returns:
-            Message ID of sent message, or None if failed
+            Message ID of sent/edited message, or None if failed
         """
         try:
             question_text = question_data.get('question_text', '')
@@ -45,36 +46,68 @@ class QuizUI:
             # Create inline keyboard
             keyboard = self._create_question_keyboard(chat_id, question_idx, options)
             
-            # Send message with keyboard
-            response = self.bot_instance.send_message(
-                chat_id=chat_id,
-                text=message_text,
-                reply_markup=keyboard,
-                parse_mode='Markdown'
-            )
+            # Get state manager to check for existing main message
+            from .state_manager import QuizStateManager
+            import os
+            data_dir = '/app/data' if os.path.exists('/app/data') else '/app'
+            quiz_data_path = os.path.join(data_dir, 'quiz_data.json')
+            state_manager = QuizStateManager(quiz_data_path)
             
-            if response and 'message_id' in response:
-                message_id = response['message_id']
-                logger.debug(f"Question {question_num} sent to chat {chat_id}, message_id: {message_id}")
+            main_message_id = state_manager.get_main_message_id(chat_id)
+            
+            if main_message_id and question_num > 1:
+                # Edit existing message for subsequent questions
+                success = self.bot_instance.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=main_message_id,
+                    text=message_text,
+                    reply_markup=keyboard,
+                    parse_mode='Markdown'
+                )
                 
-                # Track message ID for later deletion
-                try:
-                    from .state_manager import QuizStateManager
-                    import os
-                    data_dir = '/app/data' if os.path.exists('/app/data') else '/app'
-                    quiz_data_path = os.path.join(data_dir, 'quiz_data.json')
-                    state_manager = QuizStateManager(quiz_data_path)
-                    state_manager.add_message_id(chat_id, message_id)
-                except Exception as e:
-                    logger.warning(f"Failed to track message ID {message_id}: {e}")
-                
-                return message_id
+                if success:
+                    logger.debug(f"Question {question_num} edited in message {main_message_id} for chat {chat_id}")
+                    return main_message_id
+                else:
+                    # Fallback: send new message if editing fails
+                    logger.warning(f"Failed to edit question {question_num} in chat {chat_id}, sending new message")
+                    response = self.bot_instance.send_message(
+                        chat_id=chat_id,
+                        text=message_text,
+                        reply_markup=keyboard,
+                        parse_mode='Markdown'
+                    )
+                    
+                    if response and 'message_id' in response:
+                        new_message_id = response['message_id']
+                        # Update the main message ID to the new one
+                        state_manager.set_main_message_id(chat_id, new_message_id)
+                        return new_message_id
+                    else:
+                        return None
             else:
-                logger.warning(f"Failed to send question {question_num} to chat {chat_id}")
-                return None
+                # Send new message for first question
+                response = self.bot_instance.send_message(
+                    chat_id=chat_id,
+                    text=message_text,
+                    reply_markup=keyboard,
+                    parse_mode='Markdown'
+                )
+                
+                if response and 'message_id' in response:
+                    message_id = response['message_id']
+                    logger.debug(f"Question {question_num} sent to chat {chat_id}, message_id: {message_id}")
+                    
+                    # Set this as the main message ID
+                    state_manager.set_main_message_id(chat_id, message_id)
+                    
+                    return message_id
+                else:
+                    logger.warning(f"Failed to send question {question_num} to chat {chat_id}")
+                    return None
                 
         except Exception as e:
-            logger.error(f"Error sending question to chat {chat_id}: {e}")
+            logger.error(f"Error sending/editing question to chat {chat_id}: {e}")
             return None
     
     def update_question_result(self, chat_id: int, message_id: int, result_data: Dict[str, Any]) -> bool:
@@ -247,18 +280,6 @@ class QuizUI:
             if response and 'message_id' in response:
                 message_id = response['message_id']
                 logger.debug(f"Quiz progress sent to chat {chat_id}, message_id: {message_id}")
-                
-                # Track message ID for later deletion
-                try:
-                    from .state_manager import QuizStateManager
-                    import os
-                    data_dir = '/app/data' if os.path.exists('/app/data') else '/app'
-                    quiz_data_path = os.path.join(data_dir, 'quiz_data.json')
-                    state_manager = QuizStateManager(quiz_data_path)
-                    state_manager.add_message_id(chat_id, message_id)
-                except Exception as e:
-                    logger.warning(f"Failed to track message ID {message_id}: {e}")
-                
                 return message_id
             else:
                 logger.warning(f"Failed to send quiz progress to chat {chat_id}")
@@ -606,3 +627,117 @@ class QuizUI:
         
         logger.info(f"Deleted {deleted_count}/{len(message_ids)} quiz messages from chat {chat_id}")
         return deleted_count
+    
+    def edit_final_results(self, chat_id: int, leaderboard_data: List[Dict[str, Any]], 
+                          quiz_info: Dict[str, Any], last_result: str = None) -> bool:
+        """
+        Edit the main quiz message with final results
+        
+        Args:
+            chat_id: Telegram chat ID
+            leaderboard_data: Final leaderboard data
+            quiz_info: Quiz information
+            last_result: Result from the last question (optional)
+            
+        Returns:
+            True if edit successful, False otherwise
+        """
+        try:
+            # Get the main message ID
+            from .state_manager import QuizStateManager
+            import os
+            data_dir = '/app/data' if os.path.exists('/app/data') else '/app'
+            quiz_data_path = os.path.join(data_dir, 'quiz_data.json')
+            state_manager = QuizStateManager(quiz_data_path)
+            
+            main_message_id = state_manager.get_main_message_id(chat_id)
+            if not main_message_id:
+                logger.warning(f"No main message ID found for chat {chat_id}")
+                return False
+            
+            # Format final results message
+            message = ""
+            
+            # Add last result if provided
+            if last_result:
+                message += f"{last_result}\n\n"
+            
+            message += "🏁 **Quiz Complete!**\n\n"
+            
+            if leaderboard_data and len(leaderboard_data) > 0:
+                winner = leaderboard_data[0]
+                winner_points = winner.get('points', 0)
+                
+                # Show winner announcement if there's a clear winner with points
+                if winner_points > 0:
+                    if len(leaderboard_data) > 1:
+                        # Multiple participants - show winner
+                        message += f"🎉 **WINNER: {winner['username']}!** 🎉\n"
+                        message += f"🏆 Final Score: {winner_points} points\n\n"
+                        
+                        # Check if there's a tie for first place
+                        tied_winners = [p for p in leaderboard_data if p.get('points', 0) == winner_points]
+                        if len(tied_winners) > 1:
+                            tied_names = [p['username'] for p in tied_winners]
+                            message = message.replace("WINNER:", "TIE FOR FIRST:")
+                            message = message.replace(f"{winner['username']}!", f"{', '.join(tied_names)}!")
+                    else:
+                        # Solo player
+                        message += f"🎯 **Solo Victory: {winner['username']}!**\n"
+                        message += f"📊 Final Score: {winner_points} points\n\n"
+                
+                # Show final leaderboard (top 5)
+                message += "📊 **Final Leaderboard:**\n"
+                medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+                
+                for i, player in enumerate(leaderboard_data[:5]):
+                    rank = i + 1
+                    username = player.get('username', 'Unknown')
+                    points = player.get('points', 0)
+                    
+                    if rank <= len(medals):
+                        medal = medals[rank - 1]
+                        message += f"{medal} {username} - {points} points\n"
+                    else:
+                        message += f"{rank}. {username} - {points} points\n"
+                
+                if len(leaderboard_data) > 5:
+                    message += f"... and {len(leaderboard_data) - 5} more players\n"
+                    
+            else:
+                message += "🤷‍♂️ No participants scored points.\n"
+            
+            # Add quiz info
+            subject = quiz_info.get('subject', 'Unknown')
+            difficulty = quiz_info.get('difficulty', 'medium')
+            total_questions = quiz_info.get('total_questions', 0)
+            
+            message += f"\n📚 **Quiz:** {subject} ({difficulty.title()})\n"
+            message += f"❓ **Questions:** {total_questions}\n"
+            message += f"👥 **Participants:** {len(leaderboard_data) if leaderboard_data else 0}\n"
+            message += "\n🎉 Thanks for playing! Use /quiz_new to start another quiz!"
+            
+            # Edit the main message (remove keyboard)
+            success = self.bot_instance.edit_message_text(
+                chat_id=chat_id,
+                message_id=main_message_id,
+                text=message,
+                parse_mode='Markdown'
+            )
+            
+            if success:
+                logger.info(f"Final results edited in main message for chat {chat_id}")
+                return True
+            else:
+                # Fallback: send new message if editing fails
+                logger.warning(f"Failed to edit final results for chat {chat_id}, sending new message")
+                response = self.bot_instance.send_message(
+                    chat_id=chat_id,
+                    text=message,
+                    parse_mode='Markdown'
+                )
+                return response is not None
+                
+        except Exception as e:
+            logger.error(f"Error editing final results for chat {chat_id}: {e}")
+            return False

@@ -1988,17 +1988,12 @@ class SeleniumArchiveBot:
         result = self.quiz_manager.create_quiz(chat_id, subject, num_questions, difficulty)
         
         if result['success']:
-            # Check if previous quiz was stopped
-            previous_result = ""
-            if result.get('previous_quiz_stopped'):
-                previous_result = "🔄 Previous quiz stopped.\n\n"
-            
             # Quiz created successfully, send first question
             first_question = result['quiz_data'].get('first_question')
             if first_question:
                 # Add question index to the question data
                 first_question['question_index'] = 0
-                quiz_ui.send_question(chat_id, first_question, 1, num_questions, previous_result)
+                quiz_ui.send_question(chat_id, first_question, 1, num_questions)
                 return None  # Don't send additional text response
             else:
                 return "✅ Quiz created successfully, but no questions were generated."
@@ -2032,28 +2027,17 @@ class SeleniumArchiveBot:
     def handle_quiz_stop_command(self, chat_id):
         """Handle /quiz_stop command"""
         try:
-            # Get tracked message IDs before stopping quiz
-            from quiz.state_manager import QuizStateManager
-            quiz_data_path = os.path.join(self.data_dir, 'quiz_data.json')
-            state_manager = QuizStateManager(quiz_data_path)
-            tracked_messages = state_manager.get_tracked_message_ids(chat_id)
-            
             result = self.quiz_manager.stop_quiz(chat_id)
             
             if result['success']:
                 from quiz.quiz_ui import QuizUI
                 quiz_ui = QuizUI(self)
                 
-                # Send final results with winner announcement
+                # Edit main message with final results
                 if result['final_leaderboard']:
-                    quiz_ui.send_final_results(chat_id, result['final_leaderboard'], result['quiz_info'])
+                    quiz_ui.edit_final_results(chat_id, result['final_leaderboard'], result['quiz_info'])
                 
-                # Delete previous quiz messages
-                if tracked_messages:
-                    deleted_count = quiz_ui.delete_quiz_messages(chat_id, tracked_messages)
-                    logger.info(f"Deleted {deleted_count} quiz messages from chat {chat_id}")
-                
-                return None  # Don't send additional text since final results were sent
+                return None  # Don't send additional text since final results were edited
             else:
                 from quiz.quiz_ui import QuizUI
                 quiz_ui = QuizUI(self)
@@ -2370,24 +2354,13 @@ class SeleniumArchiveBot:
                 
                 # Check if quiz is complete or send next question
                 if result.get('quiz_complete'):
-                    # Get tracked message IDs before sending final results
-                    from quiz.state_manager import QuizStateManager
-                    quiz_data_path = os.path.join(self.data_dir, 'quiz_data.json')
-                    state_manager = QuizStateManager(quiz_data_path)
-                    tracked_messages = state_manager.get_tracked_message_ids(chat_id)
-                    
-                    # Send final results with last question result
+                    # Edit main message with final results
                     final_leaderboard = result.get('final_leaderboard', {})
                     if final_leaderboard.get('success'):
-                        quiz_ui.send_final_results(chat_id, final_leaderboard['leaderboard'], 
+                        quiz_ui.edit_final_results(chat_id, final_leaderboard['leaderboard'], 
                                                  final_leaderboard['quiz_info'], result_text)
-                        
-                        # Delete previous quiz messages
-                        if tracked_messages:
-                            deleted_count = quiz_ui.delete_quiz_messages(chat_id, tracked_messages)
-                            logger.info(f"Quiz completed - deleted {deleted_count} messages from chat {chat_id}")
                 elif result.get('next_question'):
-                    # Send next question with previous result
+                    # Edit message with next question and previous result
                     next_question = result['next_question']
                     quiz_status = self.quiz_manager.get_quiz_status(chat_id)
                     current_q_num = quiz_status.get('answered_questions', 0) + 1

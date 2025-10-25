@@ -358,6 +358,31 @@ class QuizStateManager:
             except Exception as e:
                 logger.error(f"Error clearing tracked message IDs for chat {chat_id}: {e}")
     
+    def set_main_message_id(self, chat_id: int, message_id: int) -> None:
+        """Set the main quiz message ID that will be edited throughout the quiz"""
+        with self.lock:
+            try:
+                data = self._read_data()
+                chat_key = str(chat_id)
+                
+                if chat_key in data:
+                    data[chat_key]['main_message_id'] = message_id
+                    self._write_data(data)
+                    logger.debug(f"Set main message ID {message_id} for chat {chat_id}")
+            except Exception as e:
+                logger.error(f"Error setting main message ID for chat {chat_id}: {e}")
+    
+    def get_main_message_id(self, chat_id: int) -> Optional[int]:
+        """Get the main quiz message ID for a chat"""
+        try:
+            quiz_state = self.load_quiz_state(chat_id)
+            if quiz_state and 'main_message_id' in quiz_state:
+                return quiz_state['main_message_id']
+            return None
+        except Exception as e:
+            logger.error(f"Error getting main message ID for chat {chat_id}: {e}")
+            return None
+    
     def validate_quiz_state(self, quiz_state: dict) -> bool:
         """Validate quiz state structure and data integrity"""
         try:
@@ -463,7 +488,8 @@ class QuizStateManager:
             'current_question': 0,
             'scores': {},
             'created_at': datetime.now().isoformat(),
-            'message_ids': []
+            'message_ids': [],
+            'main_message_id': None  # The main quiz message that gets edited
         }
     
     def _format_question(self, question_data: dict) -> dict:
