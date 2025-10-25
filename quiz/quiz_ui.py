@@ -158,7 +158,8 @@ class QuizUI:
             response = self.bot_instance.send_message(
                 chat_id=chat_id,
                 text=help_text,
-                parse_mode='Markdown'
+                parse_mode='Markdown',
+                disable_web_page_preview=True
             )
             
             if response and 'message_id' in response:
