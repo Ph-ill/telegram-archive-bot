@@ -330,30 +330,42 @@ class SeleniumArchiveBot:
             return False
     
     def start_birthday_monitor(self):
-        """Start the birthday monitoring background task"""
+        """Start the birthday monitoring background task - checks only at the start of each hour"""
         def birthday_monitor():
             while True:
                 try:
-                    self.check_and_send_birthday_messages()
-                    # Check every minute
-                    time.sleep(60)
+                    current_time = datetime.now()
+                    
+                    # Only check at the start of each hour (when minutes = 0)
+                    if current_time.minute == 0:
+                        self.check_and_send_birthday_messages()
+                        logger.debug(f"Birthday check completed at {current_time.strftime('%H:%M')}")
+                    
+                    # Calculate seconds until next hour
+                    next_hour = current_time.replace(minute=0, second=0, microsecond=0) + relativedelta(hours=1)
+                    seconds_until_next_hour = (next_hour - current_time).total_seconds()
+                    
+                    # Sleep until the next hour (with a small buffer to ensure we don't miss it)
+                    time.sleep(max(1, seconds_until_next_hour - 5))
+                    
                 except Exception as e:
                     logger.error(f"Error in birthday monitor: {e}")
-                    time.sleep(60)  # Continue checking even if there's an error
+                    time.sleep(300)  # Wait 5 minutes before retrying on error
         
         # Start monitor in background thread
         monitor_thread = threading.Thread(target=birthday_monitor, daemon=True)
         monitor_thread.start()
-        logger.info("Birthday monitor started - checking every minute")
+        logger.info("Birthday monitor started - checking at the start of each hour")
     
     def check_and_send_birthday_messages(self):
-        """Check if it's midnight in any user's timezone and send birthday messages"""
+        """Check if it's midnight in any user's timezone and send birthday messages - only called at hour boundaries"""
         try:
             birthdays = self.load_birthdays()
             if not birthdays:
                 return
             
             current_utc = datetime.now(pytz.UTC)
+            midnight_found = False
             
             for username, data in birthdays.items():
                 try:
@@ -361,8 +373,9 @@ class SeleniumArchiveBot:
                     user_tz = pytz.timezone(data['timezone'])
                     user_time = current_utc.astimezone(user_tz)
                     
-                    # Check if it's midnight (00:00) in user's timezone
+                    # Only process if it's midnight (00:00) in user's timezone
                     if user_time.hour == 0 and user_time.minute == 0:
+                        midnight_found = True
                         # Check if it's their birthday today
                         birth_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
                         today = user_time.date()
@@ -379,6 +392,9 @@ class SeleniumArchiveBot:
                             
                 except Exception as e:
                     logger.error(f"Error checking birthday for {username}: {e}")
+            
+            if not midnight_found:
+                logger.debug("No users at midnight currently - birthday check complete")
                     
         except Exception as e:
             logger.error(f"Error in birthday check: {e}")
