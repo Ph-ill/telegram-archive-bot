@@ -389,7 +389,33 @@ Important:
         for j, option in enumerate(options):
             if not isinstance(option, str) or not option.strip():
                 raise Exception(f"Question {index} option {j} is invalid")
-            cleaned_options.append(option.strip())
+            
+            # Clean the option text and remove any letter prefixes (A:, B:, etc.)
+            original_option = option.strip()
+            cleaned_option = original_option
+            
+            # Remove common prefixes like "A:", "B:", "A)", "B)", etc.
+            import re
+            # Match patterns like "A:", "A)", "a:", "a)", "A.", "A-", etc. at the start of the string
+            prefix_pattern = r'^[A-Da-d][\):.\-]\s*'
+            cleaned_option = re.sub(prefix_pattern, '', cleaned_option).strip()
+            
+            # Also handle patterns like "Option A:", "Choice A:", "(A)", etc.
+            choice_pattern = r'^(?:Option|Choice)\s+[A-Da-d][\):.\-]\s*'
+            cleaned_option = re.sub(choice_pattern, '', cleaned_option, flags=re.IGNORECASE).strip()
+            
+            # Handle parenthetical patterns like "(A)" or "[A]"
+            paren_pattern = r'^[\(\[][A-Da-d][\)\]]\s*'
+            cleaned_option = re.sub(paren_pattern, '', cleaned_option).strip()
+            
+            # Log if we cleaned something
+            if cleaned_option != original_option:
+                logger.debug(f"Cleaned option: '{original_option}' -> '{cleaned_option}'")
+            
+            if not cleaned_option:
+                raise Exception(f"Question {index} option {j} is empty after cleaning")
+                
+            cleaned_options.append(cleaned_option)
         
         # Check for duplicate options
         if len(set(cleaned_options)) != len(cleaned_options):
@@ -400,9 +426,32 @@ Important:
         if not isinstance(correct_answer, str) or not correct_answer.strip():
             raise Exception(f"Question {index} has invalid correct_answer")
         
-        correct_answer = correct_answer.strip()
+        # Clean the correct answer in the same way as options
+        original_correct_answer = correct_answer.strip()
+        correct_answer = original_correct_answer
+        
+        # Remove common prefixes like "A:", "B:", "A)", "B)", etc.
+        import re
+        prefix_pattern = r'^[A-Da-d][\):.\-]\s*'
+        correct_answer = re.sub(prefix_pattern, '', correct_answer).strip()
+        
+        # Also handle patterns like "Option A:", "Choice A:", etc.
+        choice_pattern = r'^(?:Option|Choice)\s+[A-Da-d][\):.\-]\s*'
+        correct_answer = re.sub(choice_pattern, '', correct_answer, flags=re.IGNORECASE).strip()
+        
+        # Handle parenthetical patterns like "(A)" or "[A]"
+        paren_pattern = r'^[\(\[][A-Da-d][\)\]]\s*'
+        correct_answer = re.sub(paren_pattern, '', correct_answer).strip()
+        
+        # Log if we cleaned something
+        if correct_answer != original_correct_answer:
+            logger.debug(f"Cleaned correct answer: '{original_correct_answer}' -> '{correct_answer}'")
+        
+        if not correct_answer:
+            raise Exception(f"Question {index} has empty correct_answer after cleaning")
+        
         if correct_answer not in cleaned_options:
-            raise Exception(f"Question {index} correct_answer not found in options")
+            raise Exception(f"Question {index} correct_answer '{correct_answer}' not found in cleaned options: {cleaned_options}")
         
         # Return cleaned question
         return {
