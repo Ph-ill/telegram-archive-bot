@@ -1114,45 +1114,64 @@ class SeleniumArchiveBot:
             import json
             import random
             
-            # Get posts from r/malefashionadvice
+            # Better headers to avoid Reddit blocking
             headers = {
-                'User-Agent': 'TelegramBot/1.0 (by /u/YourUsername)'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'application/json',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
             }
             
             # Try multiple subreddits for better variety
             subreddits = ['malefashionadvice', 'malefashion', 'streetwear']
-            selected_subreddit = random.choice(subreddits)
             
-            url = f"https://www.reddit.com/r/{selected_subreddit}/hot.json?limit=50"
-            response = requests.get(url, headers=headers, timeout=10)
-            
-            if response.status_code != 200:
-                return "❌ Failed to fetch fashion posts. Please try again later."
-            
-            data = response.json()
-            posts = data.get('data', {}).get('children', [])
-            
-            # Filter for image posts
             image_posts = []
-            for post in posts:
-                post_data = post.get('data', {})
-                url = post_data.get('url', '')
-                
-                # Check if it's an image URL
-                if (url.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')) or 
-                    'i.redd.it' in url or 'i.imgur.com' in url):
-                    image_posts.append({
-                        'url': url,
-                        'title': post_data.get('title', ''),
-                        'subreddit': post_data.get('subreddit', '')
-                    })
+            
+            # Try each subreddit until we find images
+            for subreddit in subreddits:
+                try:
+                    url = f"https://www.reddit.com/r/{subreddit}/hot.json?limit=25"
+                    response = requests.get(url, headers=headers, timeout=15)
+                    
+                    logger.info(f"Reddit API response for r/{subreddit}: {response.status_code}")
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        posts = data.get('data', {}).get('children', [])
+                        
+                        # Filter for image posts
+                        for post in posts:
+                            post_data = post.get('data', {})
+                            post_url = post_data.get('url', '')
+                            
+                            # Check if it's an image URL
+                            if (post_url.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')) or 
+                                'i.redd.it' in post_url or 'i.imgur.com' in post_url or
+                                'imgur.com' in post_url):
+                                image_posts.append({
+                                    'url': post_url,
+                                    'title': post_data.get('title', ''),
+                                    'subreddit': post_data.get('subreddit', '')
+                                })
+                        
+                        if image_posts:
+                            break  # Found images, no need to try other subreddits
+                            
+                except Exception as e:
+                    logger.warning(f"Failed to fetch from r/{subreddit}: {e}")
+                    continue
             
             if not image_posts:
-                return "❌ No fashion images found. Please try again later."
+                return "❌ No fashion images found. Reddit might be temporarily unavailable."
             
             # Select random image
             selected_post = random.choice(image_posts)
             image_url = selected_post['url']
+            
+            logger.info(f"Sending fashion image from r/{selected_post['subreddit']}: {image_url}")
             
             # Send the image
             telegram_url = f"{self.telegram_api_url}/sendPhoto"
@@ -1168,11 +1187,11 @@ class SeleniumArchiveBot:
                 return None  # Don't send text response when image is sent successfully
             else:
                 logger.error(f"Failed to send fashion image: {response.text}")
-                return "❌ Failed to send fashion image."
+                return "❌ Failed to send fashion image. The image URL might be invalid."
                 
         except Exception as e:
             logger.error(f"Error in mensfashion command: {e}")
-            return f"❌ Error fetching fashion image: {str(e)}"
+            return f"❌ Error fetching fashion image. Please try again later."
     
     def handle_bored_command(self):
         """Handle /bored command - get a random activity"""
