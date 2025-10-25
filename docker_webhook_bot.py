@@ -1869,7 +1869,8 @@ class SeleniumArchiveBot:
         fake_text = f"delete_birthday_message {args}"
         return self.process_delete_birthday_message(fake_text, sender_name, sender_username)
     
-    def send_message(self, chat_id, text, reply_to_message_id=None, disable_web_page_preview=False):
+    def send_message(self, chat_id, text, reply_to_message_id=None, disable_web_page_preview=False, 
+                    parse_mode=None, reply_markup=None):
         """Send message via Telegram Bot API"""
         try:
             import requests
@@ -1877,7 +1878,7 @@ class SeleniumArchiveBot:
             data = {
                 'chat_id': chat_id,
                 'text': text,
-                'parse_mode': 'HTML'
+                'parse_mode': parse_mode or 'HTML'
             }
             
             if reply_to_message_id:
@@ -1886,11 +1887,15 @@ class SeleniumArchiveBot:
             if disable_web_page_preview:
                 data['disable_web_page_preview'] = True
             
+            if reply_markup:
+                data['reply_markup'] = reply_markup
+            
             response = requests.post(url, json=data, timeout=30)
             
             if response.status_code == 200:
+                result = response.json()
                 logger.info(f"Message sent successfully to chat {chat_id}")
-                return True
+                return result.get('result', True)  # Return the message object for message_id
             else:
                 logger.error(f"Failed to send message: {response.text}")
                 return False
@@ -2062,6 +2067,31 @@ class SeleniumArchiveBot:
                 
         except Exception as e:
             logger.error(f"Error answering callback query: {e}")
+    
+    def edit_message_text(self, chat_id, message_id, text, parse_mode=None):
+        """Edit an existing message via Telegram Bot API"""
+        try:
+            import requests
+            url = f"{self.telegram_api_url}/editMessageText"
+            data = {
+                'chat_id': chat_id,
+                'message_id': message_id,
+                'text': text,
+                'parse_mode': parse_mode or 'HTML'
+            }
+            
+            response = requests.post(url, json=data, timeout=30)
+            
+            if response.status_code == 200:
+                logger.debug(f"Message {message_id} edited successfully in chat {chat_id}")
+                return response.json().get('result', True)
+            else:
+                logger.error(f"Failed to edit message: {response.text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error editing message: {e}")
+            return False
     
     def setup_routes(self):
         """Set up Flask routes for webhook"""
