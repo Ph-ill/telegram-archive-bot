@@ -86,13 +86,22 @@ class SeleniumArchiveBot:
         
         # Initialize quiz manager if API key is available
         self.quiz_manager = None
+        logger.info(f"Checking GEMINI_API_KEY: {'SET' if self.gemini_api_key else 'NOT SET'}")
+        
         if self.gemini_api_key:
             try:
+                logger.info("Attempting to import QuizManager...")
                 from quiz.quiz_manager import QuizManager
+                logger.info("QuizManager imported successfully, initializing...")
                 self.quiz_manager = QuizManager(self, self.data_dir, self.gemini_api_key)
                 logger.info("Quiz manager initialized successfully")
+            except ImportError as e:
+                logger.error(f"Failed to import quiz module: {e}")
+                self.quiz_manager = None
             except Exception as e:
                 logger.error(f"Failed to initialize quiz manager: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 self.quiz_manager = None
         else:
             logger.info("Quiz functionality disabled - GEMINI_API_KEY not provided")
@@ -1656,7 +1665,10 @@ class SeleniumArchiveBot:
     
     def handle_quiz_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
         """Handle quiz-related commands"""
+        logger.info(f"Quiz command received: {command}, quiz_manager status: {'initialized' if self.quiz_manager else 'None'}")
+        
         if not self.quiz_manager:
+            logger.warning("Quiz command called but quiz_manager is None")
             return "❌ Quiz functionality is not available. Please check that GEMINI_API_KEY is configured."
         
         try:
