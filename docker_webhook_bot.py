@@ -234,13 +234,18 @@ class SeleniumArchiveBot:
                 logger.warning("birthday_images folder not found")
                 return None
             
-            # Get all gif files
-            gif_files = glob.glob(os.path.join(image_folder, '*.gif'))
-            if not gif_files:
-                logger.warning("No gif files found in birthday_images folder")
+            # Get all image files (GIFs, PNGs, JPGs, etc.)
+            image_extensions = ['*.gif', '*.png', '*.jpg', '*.jpeg', '*.webp']
+            image_files = []
+            for extension in image_extensions:
+                image_files.extend(glob.glob(os.path.join(image_folder, extension)))
+                image_files.extend(glob.glob(os.path.join(image_folder, extension.upper())))
+            
+            if not image_files:
+                logger.warning("No image files found in birthday_images folder")
                 return None
             
-            return random.choice(gif_files)
+            return random.choice(image_files)
         except Exception as e:
             logger.error(f"Error getting birthday image: {e}")
             return None
@@ -309,15 +314,30 @@ class SeleniumArchiveBot:
             if image_path:
                 # Send with image
                 import requests
-                url = f"{self.telegram_api_url}/sendAnimation"
                 
-                with open(image_path, 'rb') as gif_file:
-                    files = {'animation': gif_file}
-                    data = {
-                        'chat_id': chat_id,
-                        'caption': message
-                    }
-                    response = requests.post(url, files=files, data=data, timeout=30)
+                # Determine if it's an animated image (GIF) or static image
+                file_extension = os.path.splitext(image_path)[1].lower()
+                
+                if file_extension == '.gif':
+                    # Use sendAnimation for GIFs
+                    url = f"{self.telegram_api_url}/sendAnimation"
+                    with open(image_path, 'rb') as image_file:
+                        files = {'animation': image_file}
+                        data = {
+                            'chat_id': chat_id,
+                            'caption': message
+                        }
+                        response = requests.post(url, files=files, data=data, timeout=30)
+                else:
+                    # Use sendPhoto for static images (PNG, JPG, etc.)
+                    url = f"{self.telegram_api_url}/sendPhoto"
+                    with open(image_path, 'rb') as image_file:
+                        files = {'photo': image_file}
+                        data = {
+                            'chat_id': chat_id,
+                            'caption': message
+                        }
+                        response = requests.post(url, files=files, data=data, timeout=30)
             else:
                 # Send text only
                 self.send_message(chat_id, message)
