@@ -747,7 +747,8 @@ class SeleniumArchiveBot:
         help_text += f"• /xkcd_number{bot_mention} &lt;number&gt; - Get a specific XKCD comic\n"
         help_text += f"  Example: /xkcd_number{bot_mention} 353\n"
         help_text += f"• /iss{bot_mention} - Get current location and crew of the International Space Station\n"
-        help_text += f"• /mensfashion{bot_mention} - Get a random men's fashion image from Reddit\n\n"
+        help_text += f"• /mensfashion{bot_mention} - Get a random men's fashion image from Reddit\n"
+        help_text += f"• /startup{bot_mention} - Get a random startup idea with relevant image\n\n"
         
         # Special user commands
         if is_special_user:
@@ -986,6 +987,9 @@ class SeleniumArchiveBot:
         elif command == "/mensfashion":
             return self.handle_mensfashion_command(chat_id)
         
+        elif command == "/startup":
+            return self.handle_startup_command(chat_id)
+        
         # Quiz commands
         elif command in ["/quiz_new", "/quiz_leaderboard", "/quiz_stop", "/quiz_help"]:
             return self.handle_quiz_command(command, args, sender_name, sender_username, sender_id, chat_id)
@@ -1192,6 +1196,142 @@ class SeleniumArchiveBot:
         except Exception as e:
             logger.error(f"Error in mensfashion command: {e}")
             return f"❌ Error fetching fashion image. Please try again later."
+    
+    def handle_startup_command(self, chat_id):
+        """Handle /startup command - send random startup idea with relevant image"""
+        try:
+            import requests
+            import json
+            import random
+            import re
+            from urllib.parse import quote
+            
+            # Get random startup idea
+            startup_response = requests.get("https://itsthisforthat.com/api.php", timeout=10)
+            
+            if startup_response.status_code != 200:
+                return "❌ Failed to fetch startup idea. Please try again later."
+            
+            startup_data = startup_response.json()
+            startup_idea = startup_data.get('this', 'Unknown') + " for " + startup_data.get('that', 'Unknown')
+            
+            logger.info(f"Generated startup idea: {startup_idea}")
+            
+            # Extract keywords for image search
+            keywords = self._extract_startup_keywords(startup_idea)
+            search_query = " ".join(keywords[:3])  # Use top 3 keywords
+            
+            logger.info(f"Image search query: {search_query}")
+            
+            # Search for relevant image using DuckDuckGo
+            image_url = self._search_startup_image(search_query)
+            
+            if image_url:
+                # Send image with startup idea as caption
+                telegram_url = f"{self.telegram_api_url}/sendPhoto"
+                data = {
+                    'chat_id': chat_id,
+                    'photo': image_url,
+                    'caption': f"💡 <b>Random Startup Idea:</b>\n\n<i>{startup_idea}</i>\n\n🚀 Ready to disrupt the market?",
+                    'parse_mode': 'HTML'
+                }
+                
+                response = requests.post(telegram_url, json=data, timeout=30)
+                
+                if response.status_code == 200:
+                    logger.info(f"Startup idea with image sent to chat {chat_id}")
+                    return None
+                else:
+                    logger.warning(f"Failed to send image, sending text only: {response.text}")
+                    # Fallback to text only
+                    return f"💡 <b>Random Startup Idea:</b>\n\n<i>{startup_idea}</i>\n\n🚀 Ready to disrupt the market?"
+            else:
+                # No image found, send text only
+                return f"💡 <b>Random Startup Idea:</b>\n\n<i>{startup_idea}</i>\n\n🚀 Ready to disrupt the market?"
+                
+        except Exception as e:
+            logger.error(f"Error in startup command: {e}")
+            return f"❌ Error fetching startup idea: {str(e)}"
+    
+    def _extract_startup_keywords(self, startup_idea):
+        """Extract relevant keywords from startup idea for image search"""
+        # Remove common words and extract meaningful terms
+        common_words = {'for', 'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'of', 'with', 'by'}
+        
+        # Split and clean words
+        words = re.findall(r'\b\w+\b', startup_idea.lower())
+        keywords = [word for word in words if word not in common_words and len(word) > 2]
+        
+        # Prioritize business/tech related terms
+        priority_terms = ['app', 'platform', 'service', 'system', 'tool', 'software', 'tech', 'digital', 'online', 'mobile']
+        
+        # Sort keywords by priority
+        prioritized = []
+        for term in priority_terms:
+            if term in keywords:
+                prioritized.append(term)
+                keywords.remove(term)
+        
+        return prioritized + keywords
+    
+    def _search_startup_image(self, query):
+        """Search for relevant image using DuckDuckGo"""
+        try:
+            import requests
+            from urllib.parse import quote
+            
+            # DuckDuckGo image search
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
+            # Add business/startup context to search
+            enhanced_query = f"{query} business startup technology"
+            encoded_query = quote(enhanced_query)
+            
+            # DuckDuckGo instant answer API for images
+            search_url = f"https://api.duckduckgo.com/?q={encoded_query}&format=json&image_type=photo&safesearch=moderate"
+            
+            response = requests.get(search_url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Try to get image from related topics or abstract
+                if 'RelatedTopics' in data and data['RelatedTopics']:
+                    for topic in data['RelatedTopics'][:5]:  # Check first 5 topics
+                        if 'Icon' in topic and topic['Icon'].get('URL'):
+                            icon_url = topic['Icon']['URL']
+                            if icon_url.startswith('http') and any(ext in icon_url for ext in ['.jpg', '.png', '.jpeg', '.gif']):
+                                return icon_url
+                
+                # Fallback: try a simple business/startup image search
+                fallback_queries = [
+                    "startup business idea",
+                    "innovation technology",
+                    "business concept",
+                    "entrepreneurship"
+                ]
+                
+                for fallback_query in fallback_queries:
+                    try:
+                        # Use a different approach - search for stock images
+                        stock_images = [
+                            "https://images.unsplash.com/photo-1556761175-b413da4baf72?w=500",  # Startup team
+                            "https://images.unsplash.com/photo-1553484771-371a605b060b?w=500",  # Innovation
+                            "https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=500",  # Business idea
+                            "https://images.unsplash.com/photo-1552664730-d307ca884978?w=500",  # Startup office
+                            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500",  # Technology
+                        ]
+                        return random.choice(stock_images)
+                    except:
+                        continue
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error searching for startup image: {e}")
+            return None
     
     def handle_bored_command(self):
         """Handle /bored command - get a random activity"""
