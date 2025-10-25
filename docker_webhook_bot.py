@@ -1396,13 +1396,30 @@ class SeleniumArchiveBot:
             
             num = data.get('num', 'Unknown')
             title = data.get('safe_title', data.get('title', 'Untitled'))
+            alt_text = data.get('alt', '')
             img_url = data.get('img', '')
+            year = data.get('year', '')
+            month = data.get('month', '')
+            day = data.get('day', '')
             
             if not img_url:
                 return f"#{num}: {title}\n❌ No image available for this comic."
             
-            # Simple caption: just number and title
+            # Format date
+            date_str = ""
+            try:
+                if year and month and day:
+                    date_obj = datetime.strptime(f"{year}-{month}-{day}", "%Y-%m-%d")
+                    date_str = date_obj.strftime("%B %d, %Y")
+            except:
+                pass
+            
+            # Build caption with title, date, and alt text
             caption = f"#{num}: {title}"
+            if date_str:
+                caption += f"\n{date_str}"
+            if alt_text:
+                caption += f"\n\n{alt_text}"
             
             # Send the comic image directly
             url = f"{self.telegram_api_url}/sendPhoto"
