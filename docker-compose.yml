@@ -13,6 +13,7 @@ services:
       - BOT_TOKEN=${BOT_TOKEN}
       - WEBHOOK_URL=${WEBHOOK_URL:-https://dimibot.coolphill.com/webhook}
       - PORT=8443
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
       - dimibot_data:/app/data
       - dimibot_logs:/app/logs
