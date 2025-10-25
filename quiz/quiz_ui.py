@@ -38,8 +38,8 @@ class QuizUI:
                 logger.error(f"Invalid question data for chat {chat_id}")
                 return None
             
-            # Format the question message
-            message_text = self._format_question_message(question_text, question_num, total_questions)
+            # Format the question message with options
+            message_text = self._format_question_message(question_text, question_num, total_questions, options)
             
             # Create inline keyboard
             keyboard = self._create_question_keyboard(chat_id, question_idx, options)
@@ -238,21 +238,31 @@ class QuizUI:
             logger.error(f"Error sending quiz progress to chat {chat_id}: {e}")
             return None
     
-    def _format_question_message(self, question_text: str, question_num: int, total_questions: int) -> str:
+    def _format_question_message(self, question_text: str, question_num: int, total_questions: int, options: List[str] = None) -> str:
         """
-        Format a question message with proper styling
+        Format a question message with proper styling and answer options
         
         Args:
             question_text: The question text
             question_num: Current question number (1-based)
             total_questions: Total number of questions
+            options: List of answer options to display
             
         Returns:
             Formatted message text
         """
         message = f"❓ **Question {question_num}/{total_questions}**\n\n"
         message += f"> {question_text}\n\n"
-        message += "👆 Choose your answer above!"
+        
+        if options:
+            message += "**Answer Options:**\n"
+            for i, option in enumerate(options):
+                letter = chr(65 + i)  # A, B, C, D
+                message += f"**{letter})** {option}\n"
+            message += "\n👆 Choose your answer using the buttons below!"
+        else:
+            message += "👆 Choose your answer above!"
+        
         return message
     
     def _format_leaderboard_message(self, leaderboard_data: List[Dict[str, Any]], 
@@ -308,7 +318,7 @@ class QuizUI:
     
     def _create_question_keyboard(self, chat_id: int, question_idx: int, options: List[str]) -> Dict[str, Any]:
         """
-        Create inline keyboard for question options
+        Create inline keyboard for question options with simple A, B, C, D buttons
         
         Args:
             chat_id: Telegram chat ID
@@ -320,24 +330,24 @@ class QuizUI:
         """
         keyboard = []
         
-        # Create buttons for each option (2 per row for better layout)
+        # Create simple letter buttons (2 per row for better layout)
         for i in range(0, len(options), 2):
             row = []
             
             # First button in row
-            option_text = options[i]
+            letter = chr(65 + i)  # A, B, C, D
             callback_data = f"quiz_{chat_id}_{question_idx}_{i}"
             row.append({
-                "text": f"A) {option_text}" if i == 0 else f"{'ABCD'[i]}) {option_text}",
+                "text": f"🔘 {letter}",
                 "callback_data": callback_data
             })
             
             # Second button in row (if exists)
             if i + 1 < len(options):
-                option_text = options[i + 1]
+                letter = chr(65 + i + 1)  # B, C, D
                 callback_data = f"quiz_{chat_id}_{question_idx}_{i + 1}"
                 row.append({
-                    "text": f"{'ABCD'[i + 1]}) {option_text}",
+                    "text": f"🔘 {letter}",
                     "callback_data": callback_data
                 })
             
