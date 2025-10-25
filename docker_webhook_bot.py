@@ -2223,6 +2223,7 @@ class SeleniumArchiveBot:
             
             if reply_markup:
                 data['reply_markup'] = reply_markup
+                logger.debug(f"Edit message with reply_markup: {reply_markup}")
             
             response = requests.post(url, json=data, timeout=30)
             
@@ -2404,31 +2405,6 @@ class SeleniumArchiveBot:
                 
         except Exception as e:
             logger.error(f"Error answering callback query: {e}")
-    
-    def edit_message_text(self, chat_id, message_id, text, parse_mode=None):
-        """Edit an existing message via Telegram Bot API"""
-        try:
-            import requests
-            url = f"{self.telegram_api_url}/editMessageText"
-            data = {
-                'chat_id': chat_id,
-                'message_id': message_id,
-                'text': text,
-                'parse_mode': parse_mode or 'HTML'
-            }
-            
-            response = requests.post(url, json=data, timeout=30)
-            
-            if response.status_code == 200:
-                logger.debug(f"Message {message_id} edited successfully in chat {chat_id}")
-                return response.json().get('result', True)
-            else:
-                logger.error(f"Failed to edit message: {response.text}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Error editing message: {e}")
-            return False
     
     def setup_routes(self):
         """Set up Flask routes for webhook"""
