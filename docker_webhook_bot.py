@@ -687,7 +687,8 @@ class SeleniumArchiveBot:
         help_text += "• /xkcd_latest@Angel_Dimi_Bot - Get the latest XKCD comic\n"
         help_text += "• /xkcd_random@Angel_Dimi_Bot - Get a random XKCD comic\n"
         help_text += "• /xkcd_number@Angel_Dimi_Bot &lt;number&gt; - Get a specific XKCD comic\n"
-        help_text += "  Example: /xkcd_number@Angel_Dimi_Bot 353\n\n"
+        help_text += "  Example: /xkcd_number@Angel_Dimi_Bot 353\n"
+        help_text += "• /iss@Angel_Dimi_Bot - Get current location and crew of the International Space Station\n\n"
         
         # Special user commands
         if is_special_user:
@@ -919,6 +920,9 @@ class SeleniumArchiveBot:
         
         elif command == "/xkcd_number":
             return self.handle_xkcd_number_command(args, chat_id)
+        
+        elif command == "/iss":
+            return self.handle_iss_command()
         
         # Admin-only commands
         elif command in ["/test_birthday", "/delete_birthday", "/list_birthdays", "/add_birthday_message", 
@@ -1446,6 +1450,143 @@ class SeleniumArchiveBot:
             logger.error(f"Error sending XKCD comic: {e}")
             return "❌ Error sending XKCD comic."
     
+    def handle_iss_command(self):
+        """Handle /iss command - get current ISS location and crew information"""
+        try:
+            import requests
+            
+            # Get ISS location
+            location_response = requests.get("http://api.open-notify.org/iss-now.json", timeout=10)
+            
+            # Get ISS crew information
+            crew_response = requests.get("http://api.open-notify.org/astros.json", timeout=10)
+            
+            if location_response.status_code != 200:
+                return "❌ Failed to get ISS location data. Please try again later."
+            
+            if crew_response.status_code != 200:
+                return "❌ Failed to get ISS crew data. Please try again later."
+            
+            location_data = location_response.json()
+            crew_data = crew_response.json()
+            
+            # Extract location data
+            latitude = float(location_data['iss_position']['latitude'])
+            longitude = float(location_data['iss_position']['longitude'])
+            timestamp = location_data['timestamp']
+            
+            # Extract crew data - filter for ISS crew only
+            total_people = crew_data.get('number', 0)
+            all_people = crew_data.get('people', [])
+            iss_crew = [person for person in all_people if person.get('craft', '').lower() == 'iss']
+            iss_crew_count = len(iss_crew)
+            
+            # Get location description
+            location_desc = self.get_location_description(latitude, longitude)
+            
+            # Format response
+            response = f"🛰️ <b>International Space Station Status:</b>\n\n"
+            response += f"<b>Current Location:</b> {location_desc}\n"
+            response += f"<b>Coordinates:</b> {latitude:.2f}°, {longitude:.2f}°\n"
+            response += f"<b>Crew on ISS:</b> {iss_crew_count} people\n\n"
+            
+            if iss_crew:
+                response += "<b>Current ISS Crew:</b>\n"
+                for person in iss_crew:
+                    name = person.get('name', 'Unknown')
+                    response += f"• {name}\n"
+            
+            # Add timestamp
+            try:
+                from datetime import datetime
+                dt = datetime.fromtimestamp(timestamp)
+                response += f"\n<i>Data updated: {dt.strftime('%H:%M:%S UTC')}</i>"
+            except:
+                pass
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error getting ISS data: {e}")
+            return "❌ Error getting ISS information. Please try again later."
+    
+    def get_location_description(self, latitude, longitude):
+        """Get a human-readable description of the ISS location"""
+        try:
+            import requests
+            
+            # Use a reverse geocoding service to get location info
+            # Using OpenStreetMap Nominatim (free, no API key required)
+            url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={latitude}&lon={longitude}&zoom=3"
+            headers = {'User-Agent': 'TelegramBot/1.0'}
+            
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Try to get country or ocean name
+                display_name = data.get('display_name', '')
+                address = data.get('address', {})
+                
+                # Check for country
+                country = address.get('country')
+                if country:
+                    return f"Over {country}"
+                
+                # Check for ocean/sea in display name
+                if 'ocean' in display_name.lower():
+                    if 'pacific' in display_name.lower():
+                        return "Over the Pacific Ocean"
+                    elif 'atlantic' in display_name.lower():
+                        return "Over the Atlantic Ocean"
+                    elif 'indian' in display_name.lower():
+                        return "Over the Indian Ocean"
+                    elif 'arctic' in display_name.lower():
+                        return "Over the Arctic Ocean"
+                    elif 'southern' in display_name.lower():
+                        return "Over the Southern Ocean"
+                    else:
+                        return "Over an ocean"
+                
+                # Check for sea
+                if 'sea' in display_name.lower():
+                    return "Over a sea"
+                
+                # Fallback to first part of display name
+                if display_name:
+                    parts = display_name.split(',')
+                    if len(parts) > 0:
+                        return f"Over {parts[0].strip()}"
+            
+            # Fallback to coordinate-based description
+            if latitude > 0:
+                lat_desc = f"{abs(latitude):.1f}°N"
+            else:
+                lat_desc = f"{abs(latitude):.1f}°S"
+                
+            if longitude > 0:
+                lon_desc = f"{abs(longitude):.1f}°E"
+            else:
+                lon_desc = f"{abs(longitude):.1f}°W"
+            
+            return f"At {lat_desc}, {lon_desc}"
+            
+        except Exception as e:
+            logger.error(f"Error getting location description: {e}")
+            # Fallback to basic coordinate description
+            if latitude > 0:
+                lat_desc = f"{abs(latitude):.1f}°N"
+            else:
+                lat_desc = f"{abs(latitude):.1f}°S"
+                
+            if longitude > 0:
+                lon_desc = f"{abs(longitude):.1f}°E"
+            else:
+                lon_desc = f"{abs(longitude):.1f}°W"
+            
+            return f"At {lat_desc}, {lon_desc}"
+    
     def handle_admin_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
         """Handle admin-only commands"""
         # Check if user is admin
@@ -1690,7 +1831,8 @@ class SeleniumArchiveBot:
                 {"command": "age_guess", "description": "Guess someone's age based on their name"},
                 {"command": "xkcd_latest", "description": "Get the latest XKCD comic"},
                 {"command": "xkcd_random", "description": "Get a random XKCD comic"},
-                {"command": "xkcd_number", "description": "Get a specific XKCD comic by number"}
+                {"command": "xkcd_number", "description": "Get a specific XKCD comic by number"},
+                {"command": "iss", "description": "Get current location and crew of the International Space Station"}
             ]
             
             # Admin commands for special users
@@ -1708,6 +1850,7 @@ class SeleniumArchiveBot:
                 {"command": "xkcd_latest", "description": "Get the latest XKCD comic"},
                 {"command": "xkcd_random", "description": "Get a random XKCD comic"},
                 {"command": "xkcd_number", "description": "Get a specific XKCD comic by number"},
+                {"command": "iss", "description": "Get current location and crew of the International Space Station"},
                 {"command": "test_birthday", "description": "Send test birthday message"},
                 {"command": "delete_birthday", "description": "Delete a user's birthday"},
                 {"command": "list_birthdays", "description": "List all stored birthdays"},
