@@ -1455,6 +1455,9 @@ class SeleniumArchiveBot:
         try:
             import requests
             
+            # Simple test first
+            return "🛰️ ISS command is working! (Test response)"
+            
             # Get ISS location
             location_response = requests.get("http://api.open-notify.org/iss-now.json", timeout=10)
             
