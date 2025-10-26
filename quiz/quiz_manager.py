@@ -212,7 +212,15 @@ class QuizManager:
                     else:
                         # Quiz is complete - record win and get final results
                         logger.info(f"Quiz completed for chat {chat_id}, stopping quiz")
-                        final_results = self.stop_quiz(chat_id, record_win=True)
+                        try:
+                            final_results = self.stop_quiz(chat_id, record_win=True)
+                            logger.info(f"stop_quiz returned: {final_results}")
+                        except Exception as e:
+                            logger.error(f"Error in stop_quiz for chat {chat_id}: {e}")
+                            import traceback
+                            logger.error(f"Traceback: {traceback.format_exc()}")
+                            final_results = {'success': False, 'final_leaderboard': [], 'quiz_info': {}}
+                        
                         result['quiz_complete'] = True
                         result['final_leaderboard'] = {
                             'success': final_results['success'],
@@ -296,10 +304,13 @@ class QuizManager:
             Dictionary with final results or error information
         """
         try:
-            if not self.is_quiz_active(chat_id):
+            # Note: We don't check is_quiz_active here because this method is called
+            # immediately after the quiz becomes inactive (when the last question is answered)
+            quiz_state = self.state_manager.load_quiz_state(chat_id)
+            if not quiz_state:
                 return {
                     'success': False,
-                    'error': 'No active quiz in this chat.',
+                    'error': 'No quiz state found for this chat.',
                     'error_type': 'no_quiz'
                 }
             
