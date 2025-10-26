@@ -2362,7 +2362,7 @@ class SeleniumArchiveBot:
                     callback_message = f"✅ Correct! +{result['points_awarded']} point"
                     result_text = f"✅ {result['username']} got it right!"
                 else:
-                    callback_message = f"❌ Wrong answer. Correct: {result['correct_answer']}"
+                    callback_message = f"❌ Incorrect answer"
                     result_text = f"❌ {result['username']} was wrong. Answer: {result['correct_answer']}"
                 
                 self.answer_callback_query(callback_query['id'], callback_message)

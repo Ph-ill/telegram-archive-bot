@@ -147,6 +147,8 @@ class QuizStateManager:
                 quiz_state['scores'][user_key]['points'] += points
                 quiz_state['scores'][user_key]['username'] = username
                 
+                logger.info(f"Updated scores for user {username} ({user_id}) in chat {chat_id}: +{points} points, total: {quiz_state['scores'][user_key]['points']}")
+                
                 self._write_data(data)
                 logger.debug(f"Scores updated for user {user_id} in chat {chat_id}: +{points} points")
             except Exception as e:
@@ -526,19 +528,29 @@ class QuizStateManager:
     def get_leaderboard_data(self, chat_id: int) -> List[dict]:
         """Get sorted leaderboard data"""
         quiz_state = self.load_quiz_state(chat_id)
-        if not quiz_state or 'scores' not in quiz_state:
+        if not quiz_state:
+            logger.warning(f"No quiz state found for chat {chat_id} when getting leaderboard")
             return []
+        
+        if 'scores' not in quiz_state:
+            logger.warning(f"No scores found in quiz state for chat {chat_id}")
+            return []
+        
+        scores = quiz_state['scores']
+        logger.info(f"Getting leaderboard for chat {chat_id}: {len(scores)} participants with scores: {scores}")
         
         # Convert scores to list and sort by points (descending)
         leaderboard = []
-        for user_id, score_data in quiz_state['scores'].items():
+        for user_id, score_data in scores.items():
             leaderboard.append({
                 'user_id': int(user_id),
                 'username': score_data['username'],
                 'points': score_data['points']
             })
         
-        return sorted(leaderboard, key=lambda x: x['points'], reverse=True)
+        sorted_leaderboard = sorted(leaderboard, key=lambda x: x['points'], reverse=True)
+        logger.info(f"Sorted leaderboard for chat {chat_id}: {sorted_leaderboard}")
+        return sorted_leaderboard
     
     def get_current_question(self, chat_id: int) -> Optional[dict]:
         """Get the current unanswered question"""
