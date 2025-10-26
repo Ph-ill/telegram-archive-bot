@@ -304,8 +304,25 @@ class QuizManager:
                 }
             
             # Get final leaderboard and quiz info before clearing
-            final_leaderboard = self.get_leaderboard(chat_id)
+            # Note: We need to get this directly since the quiz might already be marked inactive
+            leaderboard_data = self.state_manager.get_leaderboard_data(chat_id)
+            quiz_status = self.state_manager.get_quiz_status(chat_id)
             quiz_state = self.state_manager.load_quiz_state(chat_id)
+            
+            final_leaderboard = {
+                'success': True,
+                'type': 'current_quiz',
+                'leaderboard': leaderboard_data,
+                'quiz_info': {
+                    'subject': quiz_status.get('subject', 'Unknown'),
+                    'difficulty': quiz_status.get('difficulty', 'medium'),
+                    'total_questions': quiz_status.get('total_questions', 0),
+                    'answered_questions': quiz_status.get('answered_questions', 0),
+                    'participants': quiz_status.get('participants', 0)
+                }
+            }
+            
+            logger.info(f"Final leaderboard for chat {chat_id}: {len(leaderboard_data)} participants, quiz_info: {final_leaderboard['quiz_info']}")
             
             # Record win if appropriate
             if (record_win and final_leaderboard['success'] and 
