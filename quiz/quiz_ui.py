@@ -581,6 +581,18 @@ class QuizUI:
             message += f"\n📚 **Quiz:** {subject} ({difficulty.title()})\n"
             message += f"❓ **Questions:** {total_questions}\n"
             message += f"👥 **Participants:** {len(leaderboard_data) if leaderboard_data else 0}\n"
+            
+            # Show detailed breakdown for all participants
+            if leaderboard_data and total_questions > 0:
+                message += f"\n📋 **Detailed Results:**\n"
+                for i, player in enumerate(leaderboard_data):
+                    rank = i + 1
+                    username = player.get('username', 'Unknown')
+                    correct = player.get('points', 0)
+                    incorrect = total_questions - correct
+                    
+                    message += f"{rank}. **{username}**: {correct}✅ {incorrect}❌\n"
+            
             message += "\n🎉 Thanks for playing! Use /quiz_new to start another quiz!"
             
             response = self.bot_instance.send_message(

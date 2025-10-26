@@ -2033,11 +2033,25 @@ class SeleniumArchiveBot:
                 from quiz.quiz_ui import QuizUI
                 quiz_ui = QuizUI(self)
                 
-                # Edit main message with final results
-                if result['final_leaderboard']:
-                    quiz_ui.edit_final_results(chat_id, result['final_leaderboard'], result['quiz_info'])
+                # Get the main message ID to delete it
+                from quiz.state_manager import QuizStateManager
+                quiz_data_path = os.path.join(self.data_dir, 'quiz_data.json')
+                state_manager = QuizStateManager(quiz_data_path)
+                main_message_id = state_manager.get_main_message_id(chat_id)
                 
-                return None  # Don't send additional text since final results were edited
+                # Delete the question message
+                if main_message_id:
+                    success = self.delete_message(chat_id, main_message_id)
+                    if success:
+                        logger.info(f"Deleted quiz message {main_message_id} for manual stop in chat {chat_id}")
+                
+                # Send new message with final results
+                if result['final_leaderboard']:
+                    quiz_ui.send_final_results(chat_id, result['final_leaderboard'], result['quiz_info'])
+                else:
+                    self.send_message(chat_id, "🏁 **Quiz Stopped!**\n\nThe quiz has been manually stopped.", parse_mode='Markdown')
+                
+                return None  # Don't send additional text since final results were sent
             else:
                 from quiz.quiz_ui import QuizUI
                 quiz_ui = QuizUI(self)
@@ -2357,14 +2371,31 @@ class SeleniumArchiveBot:
                 logger.info(f"Quiz result for chat {chat_id}: quiz_complete={result.get('quiz_complete')}, has_next_question={bool(result.get('next_question'))}")
                 
                 if result.get('quiz_complete'):
-                    logger.info(f"Quiz completed for chat {chat_id}, editing final results")
-                    # Edit main message with final results
+                    logger.info(f"Quiz completed for chat {chat_id}, deleting question and sending final results")
+                    
+                    # Get the main message ID to delete it
+                    from quiz.state_manager import QuizStateManager
+                    quiz_data_path = os.path.join(self.data_dir, 'quiz_data.json')
+                    state_manager = QuizStateManager(quiz_data_path)
+                    main_message_id = state_manager.get_main_message_id(chat_id)
+                    
+                    # Delete the final question message
+                    if main_message_id:
+                        success = self.delete_message(chat_id, main_message_id)
+                        if success:
+                            logger.info(f"Deleted final question message {main_message_id} for chat {chat_id}")
+                        else:
+                            logger.warning(f"Failed to delete final question message {main_message_id} for chat {chat_id}")
+                    
+                    # Send new message with final results
                     final_leaderboard = result.get('final_leaderboard', {})
                     if final_leaderboard.get('success'):
-                        quiz_ui.edit_final_results(chat_id, final_leaderboard['leaderboard'], 
+                        quiz_ui.send_final_results(chat_id, final_leaderboard['leaderboard'], 
                                                  final_leaderboard['quiz_info'], result_text)
                     else:
                         logger.warning(f"Final leaderboard not successful for chat {chat_id}: {final_leaderboard}")
+                        # Send a basic completion message even if leaderboard fails
+                        self.send_message(chat_id, f"{result_text}\n\n🏁 **Quiz Complete!**\n\nThere was an issue retrieving the final results.", parse_mode='Markdown')
                 elif result.get('next_question'):
                     logger.info(f"Advancing to next question for chat {chat_id}")
                     # Edit message with next question and previous result
