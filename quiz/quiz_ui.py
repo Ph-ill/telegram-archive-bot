@@ -522,47 +522,66 @@ class QuizUI:
             Message ID of sent message, or None if failed
         """
         try:
-            message = ""
+            import html
             
             # Add last result if provided
             if last_result:
-                message += f"{last_result}\n\n"
+                message = f"{last_result}\n\n"
+            else:
+                message = ""
             
-            message += "🏁 <b>Quiz Complete!</b>\n\n"
-            
+            # TOP 3 LINES - Most important info (visible without expanding)
             if leaderboard_data and len(leaderboard_data) > 0:
                 winner = leaderboard_data[0]
                 winner_points = winner.get('points', 0)
                 
-                # Show winner announcement if there's a clear winner with points
                 if winner_points > 0:
                     if len(leaderboard_data) > 1:
                         # Multiple participants - show winner
-                        import html
                         escaped_username = html.escape(winner['username'])
-                        message += f"🎉 <b>WINNER: {escaped_username}!</b> 🎉\n"
-                        message += f"🏆 Final Score: {winner_points} points\n\n"
                         
                         # Check if there's a tie for first place
                         tied_winners = [p for p in leaderboard_data if p.get('points', 0) == winner_points]
                         if len(tied_winners) > 1:
-                            tied_names = [p['username'] for p in tied_winners]
-                            message = message.replace("WINNER:", "TIE FOR FIRST:")
-                            message = message.replace(f"{winner['username']}!", f"{', '.join(tied_names)}!")
+                            tied_names = [html.escape(p['username']) for p in tied_winners]
+                            message += f"🏁 <b>Quiz Complete!</b> 🎉 <b>TIE FOR FIRST: {', '.join(tied_names)}!</b>\n"
+                        else:
+                            message += f"🏁 <b>Quiz Complete!</b> 🎉 <b>WINNER: {escaped_username}!</b>\n"
+                        
+                        message += f"🏆 Final Score: {winner_points} points\n"
+                        message += f"👥 {len(leaderboard_data)} participants competed\n\n"
                     else:
                         # Solo player
-                        import html
                         escaped_username = html.escape(winner['username'])
-                        message += f"🎯 <b>Solo Victory: {escaped_username}!</b>\n"
-                        message += f"📊 Final Score: {winner_points} points\n\n"
-                
-                # Show final leaderboard (top 5)
+                        message += f"🏁 <b>Quiz Complete!</b> 🎯 <b>Solo Victory: {escaped_username}!</b>\n"
+                        message += f"📊 Final Score: {winner_points} points\n"
+                        
+                        # Add quiz info for solo player (since no detailed breakdown needed)
+                        subject = html.escape(quiz_info.get('subject', 'Unknown'))
+                        difficulty = quiz_info.get('difficulty', 'medium')
+                        message += f"📚 {subject} ({difficulty.title()})\n\n"
+                else:
+                    message += f"🏁 <b>Quiz Complete!</b>\n"
+                    message += f"🤷‍♂️ No participants scored points\n"
+                    subject = html.escape(quiz_info.get('subject', 'Unknown'))
+                    message += f"📚 {subject}\n\n"
+            else:
+                message += f"🏁 <b>Quiz Complete!</b>\n"
+                message += f"🤷‍♂️ No participants\n"
+                subject = html.escape(quiz_info.get('subject', 'Unknown'))
+                message += f"📚 {subject}\n\n"
+            
+            # QUOTE BLOCK - Detailed information (expandable)
+            message += "<blockquote expandable>"
+            
+            # Final leaderboard (for multiple participants)
+            if leaderboard_data and len(leaderboard_data) > 1:
                 message += "📊 <b>Final Leaderboard:</b>\n"
                 medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
                 
                 for i, player in enumerate(leaderboard_data[:5]):
                     rank = i + 1
-                    username = player.get('username', 'Unknown')
+                    username = html.escape(player.get('username', 'Unknown'))
                     points = player.get('points', 0)
                     
                     if rank <= len(medals):
@@ -573,26 +592,23 @@ class QuizUI:
                 
                 if len(leaderboard_data) > 5:
                     message += f"... and {len(leaderboard_data) - 5} more players\n"
-                    
-            else:
-                message += "🤷‍♂️ No participants scored points.\n"
+                
+                message += "\n"
             
-            # Add quiz info
-            import html
+            # Quiz information
             subject = html.escape(quiz_info.get('subject', 'Unknown'))
             difficulty = quiz_info.get('difficulty', 'medium')
             total_questions = quiz_info.get('total_questions', 0)
             
-            message += f"\n📚 <b>Quiz:</b> {subject} ({difficulty.title()})\n"
+            message += f"📚 <b>Quiz:</b> {subject} ({difficulty.title()})\n"
             message += f"❓ <b>Questions:</b> {total_questions}\n"
             message += f"👥 <b>Participants:</b> {len(leaderboard_data) if leaderboard_data else 0}\n"
             
-            # Show detailed breakdown for all participants
+            # Detailed breakdown for all participants
             if leaderboard_data and total_questions > 0:
                 message += f"\n📋 <b>Detailed Results:</b>\n"
                 for i, player in enumerate(leaderboard_data):
                     rank = i + 1
-                    import html
                     username = html.escape(player.get('username', 'Unknown'))
                     correct = player.get('points', 0)
                     incorrect = total_questions - correct
@@ -600,6 +616,7 @@ class QuizUI:
                     message += f"{rank}. <b>{username}</b>: {correct}✅ {incorrect}❌\n"
             
             message += "\n🎉 Thanks for playing! Use /quiz_new to start another quiz!"
+            message += "</blockquote>"
             
             response = self.bot_instance.send_message(
                 chat_id=chat_id,
