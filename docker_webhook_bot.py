@@ -2205,22 +2205,23 @@ class SeleniumArchiveBot:
                 'message_id': message_id
             }
             
+            logger.info(f"Attempting to delete message {message_id} from chat {chat_id}")
             response = requests.post(url, json=data, timeout=30)
             
             if response.status_code == 200:
                 result = response.json()
                 if result.get('ok'):
-                    logger.debug(f"Message {message_id} deleted successfully from chat {chat_id}")
+                    logger.info(f"Message {message_id} deleted successfully from chat {chat_id}")
                     return True
                 else:
-                    logger.warning(f"Failed to delete message {message_id}: {result.get('description', 'Unknown error')}")
+                    logger.error(f"Telegram API failed to delete message {message_id}: {result.get('description', 'Unknown error')}")
                     return False
             else:
-                logger.error(f"Failed to delete message {message_id}: {response.text}")
+                logger.error(f"HTTP error deleting message {message_id}: Status {response.status_code}, Response: {response.text}")
                 return False
                 
         except Exception as e:
-            logger.error(f"Error deleting message {message_id}: {e}")
+            logger.error(f"Exception while deleting message {message_id}: {e}")
             return False
     
     def edit_message_text(self, chat_id, message_id, text, parse_mode=None, reply_markup=None):
@@ -2379,13 +2380,17 @@ class SeleniumArchiveBot:
                     state_manager = QuizStateManager(quiz_data_path)
                     main_message_id = state_manager.get_main_message_id(chat_id)
                     
+                    logger.info(f"Retrieved main message ID for deletion: {main_message_id} for chat {chat_id}")
+                    
                     # Delete the final question message
                     if main_message_id:
                         success = self.delete_message(chat_id, main_message_id)
                         if success:
-                            logger.info(f"Deleted final question message {main_message_id} for chat {chat_id}")
+                            logger.info(f"Successfully deleted final question message {main_message_id} for chat {chat_id}")
                         else:
                             logger.warning(f"Failed to delete final question message {main_message_id} for chat {chat_id}")
+                    else:
+                        logger.warning(f"No main message ID found for chat {chat_id} - cannot delete final question")
                     
                     # Send new message with final results
                     final_leaderboard = result.get('final_leaderboard', {})

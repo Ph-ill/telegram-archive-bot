@@ -379,8 +379,12 @@ class QuizStateManager:
         try:
             quiz_state = self.load_quiz_state(chat_id)
             if quiz_state and 'main_message_id' in quiz_state:
-                return quiz_state['main_message_id']
-            return None
+                message_id = quiz_state['main_message_id']
+                logger.debug(f"Found main message ID {message_id} for chat {chat_id}")
+                return message_id
+            else:
+                logger.warning(f"No main message ID found in quiz state for chat {chat_id}")
+                return None
         except Exception as e:
             logger.error(f"Error getting main message ID for chat {chat_id}: {e}")
             return None
