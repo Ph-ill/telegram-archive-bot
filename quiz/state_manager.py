@@ -370,7 +370,9 @@ class QuizStateManager:
                 if chat_key in data:
                     data[chat_key]['main_message_id'] = message_id
                     self._write_data(data)
-                    logger.debug(f"Set main message ID {message_id} for chat {chat_id}")
+                    logger.info(f"Set main message ID {message_id} for chat {chat_id}")
+                else:
+                    logger.warning(f"No quiz state found for chat {chat_id} when setting main message ID {message_id}")
             except Exception as e:
                 logger.error(f"Error setting main message ID for chat {chat_id}: {e}")
     

@@ -2374,13 +2374,12 @@ class SeleniumArchiveBot:
                 if result.get('quiz_complete'):
                     logger.info(f"Quiz completed for chat {chat_id}, deleting question and sending final results")
                     
-                    # Get the main message ID to delete it
-                    from quiz.state_manager import QuizStateManager
-                    quiz_data_path = os.path.join(self.data_dir, 'quiz_data.json')
-                    state_manager = QuizStateManager(quiz_data_path)
-                    main_message_id = state_manager.get_main_message_id(chat_id)
+                    # Get the main message ID from the callback query message itself
+                    # Since stop_quiz already cleared the quiz state, we get it from the message that was clicked
+                    callback_message = callback_query.get('message', {})
+                    main_message_id = callback_message.get('message_id')
                     
-                    logger.info(f"Retrieved main message ID for deletion: {main_message_id} for chat {chat_id}")
+                    logger.info(f"Retrieved main message ID from callback query: {main_message_id} for chat {chat_id}")
                     
                     # Delete the final question message
                     if main_message_id:
@@ -2400,7 +2399,7 @@ class SeleniumArchiveBot:
                     else:
                         logger.warning(f"Final leaderboard not successful for chat {chat_id}: {final_leaderboard}")
                         # Send a basic completion message even if leaderboard fails
-                        self.send_message(chat_id, f"{result_text}\n\n🏁 **Quiz Complete!**\n\nThere was an issue retrieving the final results.", parse_mode='Markdown')
+                        self.send_message(chat_id, f"{result_text}\n\n🏁 **Quiz Complete!**\n\nThere was an issue retrieving the final results.", parse_mode='HTML')
                 elif result.get('next_question'):
                     logger.info(f"Advancing to next question for chat {chat_id}")
                     # Edit message with next question and previous result
