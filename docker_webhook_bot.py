@@ -2395,11 +2395,11 @@ class SeleniumArchiveBot:
                     final_leaderboard = result.get('final_leaderboard', {})
                     if final_leaderboard.get('success'):
                         quiz_ui.send_final_results(chat_id, final_leaderboard['leaderboard'], 
-                                                 final_leaderboard['quiz_info'], result_text)
+                                                 final_leaderboard['quiz_info'])
                     else:
                         logger.warning(f"Final leaderboard not successful for chat {chat_id}: {final_leaderboard}")
                         # Send a basic completion message even if leaderboard fails
-                        self.send_message(chat_id, f"{result_text}\n\n🏁 **Quiz Complete!**\n\nThere was an issue retrieving the final results.", parse_mode='HTML')
+                        self.send_message(chat_id, "🏁 **Quiz Complete!**\n\nThere was an issue retrieving the final results.", parse_mode='HTML')
                 elif result.get('next_question'):
                     logger.info(f"Advancing to next question for chat {chat_id}")
                     # Edit message with next question and previous result
