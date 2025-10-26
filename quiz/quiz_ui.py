@@ -528,7 +528,7 @@ class QuizUI:
             if last_result:
                 message += f"{last_result}\n\n"
             
-            message += "🏁 **Quiz Complete!**\n\n"
+            message += "🏁 <b>Quiz Complete!</b>\n\n"
             
             if leaderboard_data and len(leaderboard_data) > 0:
                 winner = leaderboard_data[0]
@@ -538,7 +538,9 @@ class QuizUI:
                 if winner_points > 0:
                     if len(leaderboard_data) > 1:
                         # Multiple participants - show winner
-                        message += f"🎉 **WINNER: {winner['username']}!** 🎉\n"
+                        import html
+                        escaped_username = html.escape(winner['username'])
+                        message += f"🎉 <b>WINNER: {escaped_username}!</b> 🎉\n"
                         message += f"🏆 Final Score: {winner_points} points\n\n"
                         
                         # Check if there's a tie for first place
@@ -549,11 +551,13 @@ class QuizUI:
                             message = message.replace(f"{winner['username']}!", f"{', '.join(tied_names)}!")
                     else:
                         # Solo player
-                        message += f"🎯 **Solo Victory: {winner['username']}!**\n"
+                        import html
+                        escaped_username = html.escape(winner['username'])
+                        message += f"🎯 <b>Solo Victory: {escaped_username}!</b>\n"
                         message += f"📊 Final Score: {winner_points} points\n\n"
                 
                 # Show final leaderboard (top 5)
-                message += "📊 **Final Leaderboard:**\n"
+                message += "📊 <b>Final Leaderboard:</b>\n"
                 medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
                 
                 for i, player in enumerate(leaderboard_data[:5]):
@@ -574,31 +578,33 @@ class QuizUI:
                 message += "🤷‍♂️ No participants scored points.\n"
             
             # Add quiz info
-            subject = quiz_info.get('subject', 'Unknown')
+            import html
+            subject = html.escape(quiz_info.get('subject', 'Unknown'))
             difficulty = quiz_info.get('difficulty', 'medium')
             total_questions = quiz_info.get('total_questions', 0)
             
-            message += f"\n📚 **Quiz:** {subject} ({difficulty.title()})\n"
-            message += f"❓ **Questions:** {total_questions}\n"
-            message += f"👥 **Participants:** {len(leaderboard_data) if leaderboard_data else 0}\n"
+            message += f"\n📚 <b>Quiz:</b> {subject} ({difficulty.title()})\n"
+            message += f"❓ <b>Questions:</b> {total_questions}\n"
+            message += f"👥 <b>Participants:</b> {len(leaderboard_data) if leaderboard_data else 0}\n"
             
             # Show detailed breakdown for all participants
             if leaderboard_data and total_questions > 0:
-                message += f"\n📋 **Detailed Results:**\n"
+                message += f"\n📋 <b>Detailed Results:</b>\n"
                 for i, player in enumerate(leaderboard_data):
                     rank = i + 1
-                    username = player.get('username', 'Unknown')
+                    import html
+                    username = html.escape(player.get('username', 'Unknown'))
                     correct = player.get('points', 0)
                     incorrect = total_questions - correct
                     
-                    message += f"{rank}. **{username}**: {correct}✅ {incorrect}❌\n"
+                    message += f"{rank}. <b>{username}</b>: {correct}✅ {incorrect}❌\n"
             
             message += "\n🎉 Thanks for playing! Use /quiz_new to start another quiz!"
             
             response = self.bot_instance.send_message(
                 chat_id=chat_id,
                 text=message,
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             
             if response and 'message_id' in response:
