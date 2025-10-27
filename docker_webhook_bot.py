@@ -1,4 +1,4 @@
-⏭️ Question skipped by Unknown#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Selenium-based Archive Bot - Actually creates new archives by automating browser
 """
