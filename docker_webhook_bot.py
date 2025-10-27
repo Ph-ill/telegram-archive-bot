@@ -991,7 +991,7 @@ class SeleniumArchiveBot:
             return self.handle_startup_command(chat_id)
         
         # Quiz commands
-        elif command in ["/quiz_new", "/quiz_leaderboard", "/quiz_stop", "/quiz_help"]:
+        elif command in ["/quiz_new", "/quiz_leaderboard", "/quiz_stop", "/quiz_help", "/quiz_skip"]:
             return self.handle_quiz_command(command, args, sender_name, sender_username, sender_id, chat_id)
         
         # Admin-only commands
