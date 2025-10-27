@@ -1972,11 +1972,13 @@ class SeleniumArchiveBot:
         # Default values
         num_questions = 5
         difficulty = "medium"
+        difficulty_extracted = False
         
         # Check if last part is a difficulty level
         if len(remaining_parts) > 1 and remaining_parts[-1].lower() in ['easy', 'medium', 'hard', 'expert']:
             difficulty = remaining_parts[-1].lower()
             remaining_parts = remaining_parts[:-1]
+            difficulty_extracted = True
         
         # Check if last part is a number
         if len(remaining_parts) > 1:
@@ -1988,6 +1990,35 @@ class SeleniumArchiveBot:
         
         # Remaining parts form the topic
         topic = " ".join(remaining_parts)
+        
+        # If no explicit difficulty was provided, check if topic contains a difficulty word
+        if not difficulty_extracted:
+            difficulty_words = ['easy', 'medium', 'hard', 'expert']
+            topic_lower = topic.lower()
+            topic_words = topic_lower.split()
+            
+            # Find difficulty words in topic
+            found_difficulties = [word for word in difficulty_words if word in topic_words]
+            
+            # If exactly one difficulty word is found, extract it
+            if len(found_difficulties) == 1:
+                difficulty_word = found_difficulties[0]
+                # Remove the difficulty word from topic (case-insensitive)
+                topic_parts = topic.split()
+                new_topic_parts = []
+                removed = False
+                
+                for part in topic_parts:
+                    if part.lower() == difficulty_word and not removed:
+                        # Skip this word (remove it from topic)
+                        removed = True
+                    else:
+                        new_topic_parts.append(part)
+                
+                if removed:
+                    topic = " ".join(new_topic_parts).strip()
+                    difficulty = difficulty_word
+                    logger.info(f"Extracted difficulty '{difficulty}' from topic. New topic: '{topic}'")
         
         # Create quiz UI instance
         from quiz.quiz_ui import QuizUI
