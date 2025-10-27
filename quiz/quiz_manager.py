@@ -490,7 +490,7 @@ class QuizManager:
             
             logger.info(f"Final leaderboard for chat {chat_id}: {len(leaderboard_data)} participants, quiz_info: {final_leaderboard['quiz_info']}")
             
-            # Record win if appropriate
+            # Record win and participation if appropriate
             if (record_win and final_leaderboard['success'] and 
                 final_leaderboard.get('leaderboard') and
                 self.state_manager.check_quiz_has_multiple_participants(chat_id)):
@@ -500,6 +500,7 @@ class QuizManager:
                 quiz_info = final_leaderboard.get('quiz_info', {})
                 
                 if winner['points'] > 0:  # Only record if winner actually scored
+                    # Record the winner
                     self.state_manager.record_quiz_win(
                         winner_user_id=winner['user_id'],
                         winner_username=winner['username'],
@@ -509,6 +510,14 @@ class QuizManager:
                         total_questions=quiz_info.get('total_questions', 0)
                     )
                     logger.info(f"Recorded quiz win for {winner['username']} in chat {chat_id}")
+                    
+                    # Record participation for all non-winners
+                    for participant in final_leaderboard['leaderboard'][1:]:
+                        self.state_manager.record_quiz_participation(
+                            user_id=participant['user_id'],
+                            username=participant['username']
+                        )
+                        logger.info(f"Recorded quiz participation for {participant['username']} in chat {chat_id}")
             
             # Clear quiz state
             self.state_manager.clear_quiz_state(chat_id)
