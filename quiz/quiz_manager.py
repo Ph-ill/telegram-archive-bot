@@ -217,11 +217,13 @@ class QuizManager:
             }
             
             # Always record the answer for scoring purposes
+            # Add user to scores even if incorrect (with 0 points) to track participation
             if is_correct:
                 self.state_manager.update_scores(chat_id, user_id, username, 1)
                 result['points_awarded'] = 1
                 logger.info(f"User {username} ({user_id}) answered question {question_idx} correctly in chat {chat_id}")
             else:
+                self.state_manager.update_scores(chat_id, user_id, username, 0)
                 result['points_awarded'] = 0
                 logger.info(f"User {username} ({user_id}) answered question {question_idx} incorrectly in chat {chat_id}")
             
