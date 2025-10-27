@@ -270,6 +270,7 @@ class QuizManager:
                             'leaderboard': final_results.get('final_leaderboard', []),
                             'quiz_info': final_results.get('quiz_info', {})
                         }
+                        result['questions'] = final_results.get('questions', [])
                         logger.info(f"Quiz completion result for chat {chat_id}: {result['quiz_complete']}")
                 else:
                     # Don't advance - stay on current question
@@ -378,6 +379,7 @@ class QuizManager:
                         'leaderboard': final_results.get('final_leaderboard', []),
                         'quiz_info': final_results.get('quiz_info', {})
                     },
+                    'questions': final_results.get('questions', []),
                     'username': username,
                     'message': f'Quiz completed after skip by {username}.'
                 }
