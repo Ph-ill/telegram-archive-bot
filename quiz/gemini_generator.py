@@ -453,11 +453,32 @@ Important:
         if correct_answer not in cleaned_options:
             raise Exception(f"Question {index} correct_answer '{correct_answer}' not found in cleaned options: {cleaned_options}")
         
-        # Return cleaned question
+        # Shuffle the options to prevent AI bias toward option A
+        import random
+        
+        # Create a list of (option, is_correct) tuples
+        option_pairs = [(option, option == correct_answer) for option in cleaned_options]
+        
+        # Shuffle the pairs
+        random.shuffle(option_pairs)
+        
+        # Extract shuffled options and find new correct answer
+        shuffled_options = [pair[0] for pair in option_pairs]
+        shuffled_correct_answer = None
+        
+        for option, is_correct in option_pairs:
+            if is_correct:
+                shuffled_correct_answer = option
+                break
+        
+        logger.debug(f"Question {index} options shuffled: {cleaned_options} -> {shuffled_options}")
+        logger.debug(f"Question {index} correct answer: '{correct_answer}' -> '{shuffled_correct_answer}'")
+        
+        # Return cleaned and shuffled question
         return {
             'question_text': question_text.strip(),
-            'options': cleaned_options,
-            'correct_answer': correct_answer
+            'options': shuffled_options,
+            'correct_answer': shuffled_correct_answer
         }
     
     def list_available_models(self) -> list:
