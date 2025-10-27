@@ -375,32 +375,6 @@ class QuizStateManager:
                     pass
             raise
     
-    def get_persistent_leaderboard(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get the persistent leaderboard sorted by total wins"""
-        try:
-            data = self._read_leaderboard_data()
-            
-            # Convert to list and sort by total wins
-            leaderboard = []
-            for user_id, user_data in data.items():
-                leaderboard.append({
-                    'user_id': int(user_id),
-                    'username': user_data['username'],
-                    'total_wins': user_data['total_wins'],
-                    'subjects_won': user_data['subjects_won'],
-                    'difficulty_wins': user_data['difficulty_wins'],
-                    'last_win_date': user_data['last_win_date']
-                })
-            
-            # Sort by total wins (descending)
-            leaderboard.sort(key=lambda x: x['total_wins'], reverse=True)
-            
-            return leaderboard[:limit]
-            
-        except Exception as e:
-            logger.error(f"Error getting persistent leaderboard: {e}")
-            return []
-    
     def check_quiz_has_multiple_participants(self, chat_id: int) -> bool:
         """Check if the current quiz has multiple participants who attempted questions"""
         try:
@@ -803,29 +777,32 @@ class QuizStateManager:
             except Exception as e:
                 logger.error(f"Failed to record quiz participation for {username}: {e}")
     
-    def get_persistent_leaderboard(self) -> List[Dict[str, Any]]:
+    def get_persistent_leaderboard(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get the persistent leaderboard sorted by quiz wins"""
         try:
             data = self._read_leaderboard_data()
             
             leaderboard = []
             for user_id, stats in data.items():
-                if stats['quiz_wins'] > 0:  # Only show users who have won at least one quiz
+                if stats.get('quiz_wins', 0) > 0:  # Only show users who have won at least one quiz
                     leaderboard.append({
                         'user_id': int(user_id),
-                        'username': stats['username'],
-                        'quiz_wins': stats['quiz_wins'],
-                        'total_points': stats['total_points'],
-                        'quizzes_participated': stats['quizzes_participated'],
-                        'win_rate': round((stats['quiz_wins'] / stats['quizzes_participated']) * 100, 1) if stats['quizzes_participated'] > 0 else 0,
+                        'username': stats.get('username', f'user_{user_id}'),
+                        'quiz_wins': stats.get('quiz_wins', 0),
+                        'total_points': stats.get('total_points', 0),
+                        'quizzes_participated': stats.get('quizzes_participated', 0),
+                        'win_rate': round((stats.get('quiz_wins', 0) / stats.get('quizzes_participated', 1)) * 100, 1) if stats.get('quizzes_participated', 0) > 0 else 0,
                         'last_win_date': stats.get('last_win_date')
                     })
             
             # Sort by quiz wins (descending), then by win rate (descending)
-            return sorted(leaderboard, key=lambda x: (x['quiz_wins'], x['win_rate']), reverse=True)
+            sorted_leaderboard = sorted(leaderboard, key=lambda x: (x['quiz_wins'], x['win_rate']), reverse=True)
+            return sorted_leaderboard[:limit]
             
         except Exception as e:
             logger.error(f"Error getting persistent leaderboard: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return []
     
     def _read_leaderboard_data(self) -> Dict[str, Any]:
@@ -888,33 +865,6 @@ class QuizStateManager:
                 logger.debug(f"Updated participation stats for {len(participants)} users")
             except Exception as e:
                 logger.error(f"Failed to update participation stats: {e}")
-    
-    def get_persistent_leaderboard(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get persistent leaderboard data sorted by wins"""
-        try:
-            data = self._read_leaderboard_data()
-            
-            # Convert to list and sort by wins (descending), then by total_points
-            leaderboard = []
-            for user_id, stats in data.items():
-                if stats.get('wins', 0) > 0:  # Only include users with at least one win
-                    leaderboard.append({
-                        'user_id': int(user_id),
-                        'username': stats['username'],
-                        'wins': stats['wins'],
-                        'total_points': stats.get('total_points', 0),
-                        'quizzes_participated': stats.get('quizzes_participated', 0),
-                        'last_win_date': stats.get('last_win_date'),
-                        'win_rate': round((stats['wins'] / max(stats.get('quizzes_participated', 1), 1)) * 100, 1)
-                    })
-            
-            # Sort by wins (descending), then by total_points (descending)
-            leaderboard.sort(key=lambda x: (x['wins'], x['total_points']), reverse=True)
-            
-            return leaderboard[:limit]
-        except Exception as e:
-            logger.error(f"Error getting persistent leaderboard: {e}")
-            return []
     
     def check_quiz_has_multiple_participants(self, chat_id: int) -> bool:
         """Check if quiz has multiple participants (to prevent solo play wins)"""
