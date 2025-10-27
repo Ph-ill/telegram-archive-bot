@@ -206,8 +206,12 @@ class QuizStateManager:
                 question = quiz_state['questions'][question_idx]
                 attempted_by = question.get('attempted_by', [])
                 
-                result = user_id in attempted_by
-                logger.info(f"CHECK_ATTEMPT_DEBUG: chat_id={chat_id}, user_id={user_id}, question_idx={question_idx}, attempted_by={attempted_by}, result={result}")
+                # Ensure consistent data types for comparison
+                user_id_int = int(user_id)
+                attempted_by_ints = [int(x) for x in attempted_by]
+                
+                result = user_id_int in attempted_by_ints
+                logger.info(f"CHECK_ATTEMPT_DEBUG: chat_id={chat_id}, user_id={user_id} -> {user_id_int}, question_idx={question_idx}, attempted_by={attempted_by} -> {attempted_by_ints}, result={result}")
                 return result
             except Exception as e:
                 logger.error(f"Failed to check user attempt for question {question_idx} in chat {chat_id}: {e}")
@@ -231,12 +235,16 @@ class QuizStateManager:
                 if 'attempted_by' not in question:
                     question['attempted_by'] = []
                 
-                if user_id not in question['attempted_by']:
-                    question['attempted_by'].append(user_id)
+                # Ensure consistent data types for storage
+                user_id_int = int(user_id)
+                attempted_by_ints = [int(x) for x in question['attempted_by']]
+                
+                if user_id_int not in attempted_by_ints:
+                    question['attempted_by'].append(user_id_int)
                     self._write_data(data)
-                    logger.info(f"MARK_ATTEMPT_DEBUG: User {user_id} marked as attempted question {question_idx} in chat {chat_id}. List now: {question['attempted_by']}")
+                    logger.info(f"MARK_ATTEMPT_DEBUG: User {user_id} -> {user_id_int} marked as attempted question {question_idx} in chat {chat_id}. List now: {question['attempted_by']}")
                 else:
-                    logger.info(f"MARK_ATTEMPT_DEBUG: User {user_id} already in attempted_by list: {question['attempted_by']}")
+                    logger.info(f"MARK_ATTEMPT_DEBUG: User {user_id} -> {user_id_int} already in attempted_by list: {question['attempted_by']}")
                 
                 return True
             except Exception as e:
