@@ -537,15 +537,16 @@ class QuizUI:
         return f"✅ {message}"
     
     def send_final_results(self, chat_id: int, leaderboard_data: List[Dict[str, Any]], 
-                          quiz_info: Dict[str, Any], last_result: str = None) -> Optional[int]:
+                          quiz_info: Dict[str, Any], last_result: str = None, questions: List[Dict[str, Any]] = None) -> Optional[int]:
         """
-        Send final quiz results with winner announcement
+        Send final quiz results with winner announcement and question-by-question breakdown
         
         Args:
             chat_id: Telegram chat ID
             leaderboard_data: Final leaderboard data
             quiz_info: Quiz information
             last_result: Result from the last question (optional)
+            questions: List of questions with answers and attempt data (optional)
             
         Returns:
             Message ID of sent message, or None if failed
@@ -628,9 +629,41 @@ class QuizUI:
                 message += f"❓ <b>Questions:</b> {total_questions}\n"
                 message += f"👥 <b>Participants:</b> {len(leaderboard_data)}\n"
             
-            # Detailed breakdown for all participants
+            # Question-by-question breakdown with correct answers and who got them right/wrong
+            if questions and leaderboard_data:
+                message += f"\n📝 <b>Question Breakdown:</b>\n"
+                
+                for i, question in enumerate(questions):
+                    q_num = i + 1
+                    q_text = question.get('question_text', 'Unknown question')
+                    correct_answer = question.get('correct_answer', 'Unknown')
+                    correct_users = question.get('correct_users', [])
+                    incorrect_users = question.get('incorrect_users', [])
+                    
+                    # Truncate long questions
+                    if len(q_text) > 80:
+                        q_text = q_text[:77] + "..."
+                    
+                    message += f"\n<b>Q{q_num}:</b> {html.escape(q_text)}\n"
+                    message += f"<b>✓ Answer:</b> {html.escape(correct_answer)}\n"
+                    
+                    # Show who got it correct
+                    if correct_users:
+                        correct_names = [html.escape(u.get('username', f"user_{u.get('user_id')}")) for u in correct_users]
+                        message += f"✅ <b>Correct:</b> {', '.join(correct_names)}\n"
+                    
+                    # Show who got it wrong
+                    if incorrect_users:
+                        incorrect_names = [html.escape(u.get('username', f"user_{u.get('user_id')}")) for u in incorrect_users]
+                        message += f"❌ <b>Incorrect:</b> {', '.join(incorrect_names)}\n"
+                    
+                    # If no one attempted
+                    if not correct_users and not incorrect_users:
+                        message += f"<i>No one attempted this question</i>\n"
+            
+            # Detailed breakdown for all participants (summary)
             if leaderboard_data and quiz_info.get('total_questions', 0) > 0:
-                message += f"\n📋 <b>Detailed Results:</b>\n"
+                message += f"\n📋 <b>Score Summary:</b>\n"
                 for i, player in enumerate(leaderboard_data):
                     rank = i + 1
                     username = html.escape(player.get('username', 'Unknown'))

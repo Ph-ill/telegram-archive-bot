@@ -204,6 +204,9 @@ class QuizManager:
             correct_answer = question.get('correct_answer', '')
             is_correct = answer.strip() == correct_answer.strip()
             
+            # Record whether this user got the question correct or incorrect
+            self.state_manager.record_answer_result(chat_id, question_idx, user_id, username, is_correct)
+            
             result = {
                 'success': True,
                 'is_correct': is_correct,
@@ -464,6 +467,9 @@ class QuizManager:
             logger.info(f"Quiz status: {quiz_status}")
             logger.info(f"Quiz state active: {quiz_state.get('active') if quiz_state else 'No state'}")
             
+            # Get questions with answers for detailed breakdown
+            questions_data = quiz_state.get('questions', [])
+            
             final_leaderboard = {
                 'success': True,
                 'type': 'current_quiz',
@@ -474,7 +480,8 @@ class QuizManager:
                     'total_questions': quiz_status.get('total_questions', 0),
                     'answered_questions': quiz_status.get('answered_questions', 0),
                     'participants': quiz_status.get('participants', 0)
-                }
+                },
+                'questions': questions_data  # Include questions for detailed breakdown
             }
             
             logger.info(f"Final leaderboard for chat {chat_id}: {len(leaderboard_data)} participants, quiz_info: {final_leaderboard['quiz_info']}")
@@ -507,7 +514,8 @@ class QuizManager:
             return {
                 'success': True,
                 'final_leaderboard': final_leaderboard.get('leaderboard', []) if final_leaderboard['success'] else [],
-                'quiz_info': final_leaderboard.get('quiz_info', {}) if final_leaderboard['success'] else {}
+                'quiz_info': final_leaderboard.get('quiz_info', {}) if final_leaderboard['success'] else {},
+                'questions': final_leaderboard.get('questions', []) if final_leaderboard['success'] else []
             }
             
         except Exception as e:

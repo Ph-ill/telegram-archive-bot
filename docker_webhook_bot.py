@@ -2046,8 +2046,12 @@ class SeleniumArchiveBot:
                     # Quiz completed after skip
                     final_leaderboard = result.get('final_leaderboard', {})
                     if final_leaderboard.get('success'):
-                        quiz_ui.send_final_results(chat_id, final_leaderboard['leaderboard'], 
-                                                 final_leaderboard['quiz_info'])
+                        quiz_ui.send_final_results(
+                            chat_id, 
+                            final_leaderboard['leaderboard'], 
+                            final_leaderboard['quiz_info'],
+                            questions=result.get('questions', [])
+                        )
                     return None
                 elif result.get('next_question'):
                     # Show next question
@@ -2090,7 +2094,12 @@ class SeleniumArchiveBot:
                 
                 # Send new message with final results
                 if result['final_leaderboard']:
-                    quiz_ui.send_final_results(chat_id, result['final_leaderboard'], result['quiz_info'])
+                    quiz_ui.send_final_results(
+                        chat_id, 
+                        result['final_leaderboard'], 
+                        result['quiz_info'],
+                        questions=result.get('questions', [])
+                    )
                 else:
                     self.send_message(chat_id, "🏁 **Quiz Stopped!**\n\nThe quiz has been manually stopped.", parse_mode='Markdown')
                 
@@ -2442,8 +2451,12 @@ class SeleniumArchiveBot:
                     # Send new message with final results
                     final_leaderboard = result.get('final_leaderboard', {})
                     if final_leaderboard.get('success'):
-                        quiz_ui.send_final_results(chat_id, final_leaderboard['leaderboard'], 
-                                                 final_leaderboard['quiz_info'])
+                        quiz_ui.send_final_results(
+                            chat_id, 
+                            final_leaderboard['leaderboard'], 
+                            final_leaderboard['quiz_info'],
+                            questions=result.get('questions', [])
+                        )
                     else:
                         logger.warning(f"Final leaderboard not successful for chat {chat_id}: {final_leaderboard}")
                         # Send a basic completion message even if leaderboard fails

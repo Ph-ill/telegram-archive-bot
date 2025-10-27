@@ -235,6 +235,51 @@ class QuizStateManager:
                 # Fail safe: return False to allow the attempt (better than blocking legitimate attempts)
                 return False
     
+    def record_answer_result(self, chat_id: int, question_idx: int, user_id: int, username: str, is_correct: bool) -> bool:
+        """Record whether a user answered a question correctly or incorrectly"""
+        with self.lock:
+            try:
+                data = self._read_data()
+                chat_key = str(chat_id)
+                
+                if chat_key not in data:
+                    logger.error(f"RECORD_ANSWER: No quiz state found for chat {chat_id}")
+                    return False
+                
+                quiz_state = data[chat_key]
+                if 'questions' not in quiz_state or question_idx >= len(quiz_state['questions']):
+                    logger.error(f"RECORD_ANSWER: Invalid question index {question_idx} for chat {chat_id}")
+                    return False
+                
+                question = quiz_state['questions'][question_idx]
+                
+                # Initialize lists if they don't exist
+                if 'correct_users' not in question:
+                    question['correct_users'] = []
+                if 'incorrect_users' not in question:
+                    question['incorrect_users'] = []
+                
+                user_id_int = int(user_id)
+                user_data = {'user_id': user_id_int, 'username': username}
+                
+                if is_correct:
+                    if user_id_int not in [u['user_id'] for u in question['correct_users']]:
+                        question['correct_users'].append(user_data)
+                        logger.info(f"✓ RECORDED CORRECT: User {username} ({user_id_int}) answered Q{question_idx} correctly in chat {chat_id}")
+                else:
+                    if user_id_int not in [u['user_id'] for u in question['incorrect_users']]:
+                        question['incorrect_users'].append(user_data)
+                        logger.info(f"✗ RECORDED INCORRECT: User {username} ({user_id_int}) answered Q{question_idx} incorrectly in chat {chat_id}")
+                
+                self._write_data(data)
+                return True
+                
+            except Exception as e:
+                logger.error(f"CRITICAL ERROR recording answer result for question {question_idx} in chat {chat_id}: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                return False
+    
     def mark_user_attempted_question(self, chat_id: int, question_idx: int, user_id: int) -> bool:
         """Mark that a user has attempted this question - CRITICAL for preventing repeat attempts"""
         with self.lock:
@@ -567,7 +612,9 @@ class QuizStateManager:
             'correct_answer': question_data.get('correct_answer', ''),
             'answered': False,
             'answered_by': None,
-            'attempted_by': []  # Track users who have attempted this question
+            'attempted_by': [],  # Track users who have attempted this question
+            'correct_users': [],  # Track users who answered correctly
+            'incorrect_users': []  # Track users who answered incorrectly
         }
     
     def get_quiz_status(self, chat_id: int) -> dict:
