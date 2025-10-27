@@ -190,17 +190,19 @@ class QuizStateManager:
                 return False
     
     def check_user_attempted_question(self, chat_id: int, question_idx: int, user_id: int) -> bool:
-        """Check if user has already attempted this question"""
+        """Check if user has already attempted this question - CRITICAL for preventing repeat attempts"""
         with self.lock:
             try:
                 data = self._read_data()
                 chat_key = str(chat_id)
                 
                 if chat_key not in data:
+                    logger.debug(f"CHECK_ATTEMPT: No quiz state for chat {chat_id}, returning False")
                     return False
                 
                 quiz_state = data[chat_key]
                 if 'questions' not in quiz_state or question_idx >= len(quiz_state['questions']):
+                    logger.warning(f"CHECK_ATTEMPT: Invalid question index {question_idx} for chat {chat_id}, returning False")
                     return False
                 
                 question = quiz_state['questions'][question_idx]
@@ -212,35 +214,47 @@ class QuizStateManager:
                     attempted_by_ints = [int(x) for x in attempted_by]
                     
                     result = user_id_int in attempted_by_ints
-                    logger.info(f"CHECK_ATTEMPT_DEBUG: chat_id={chat_id}, user_id={user_id} -> {user_id_int}, question_idx={question_idx}, attempted_by={attempted_by} -> {attempted_by_ints}, result={result}")
+                    if result:
+                        logger.info(f"✗ REPEAT ATTEMPT DETECTED: User {user_id_int} already attempted question {question_idx} in chat {chat_id}. List: {attempted_by_ints}")
+                    else:
+                        logger.info(f"✓ FIRST ATTEMPT: User {user_id_int} has not attempted question {question_idx} in chat {chat_id}. List: {attempted_by_ints}")
                     return result
                 except (ValueError, TypeError) as e:
                     logger.error(f"Data type conversion error in check_user_attempted_question: {e}, user_id={user_id}, attempted_by={attempted_by}")
                     # Fallback to original comparison
                     result = user_id in attempted_by
-                    logger.info(f"CHECK_ATTEMPT_FALLBACK: chat_id={chat_id}, user_id={user_id}, attempted_by={attempted_by}, result={result}")
+                    if result:
+                        logger.info(f"✗ REPEAT ATTEMPT DETECTED (fallback): User {user_id} already attempted question {question_idx}. List: {attempted_by}")
+                    else:
+                        logger.info(f"✓ FIRST ATTEMPT (fallback): User {user_id} has not attempted question {question_idx}. List: {attempted_by}")
                     return result
             except Exception as e:
-                logger.error(f"Failed to check user attempt for question {question_idx} in chat {chat_id}: {e}")
+                logger.error(f"CRITICAL ERROR checking user attempt for question {question_idx} in chat {chat_id}: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                # Fail safe: return False to allow the attempt (better than blocking legitimate attempts)
                 return False
     
     def mark_user_attempted_question(self, chat_id: int, question_idx: int, user_id: int) -> bool:
-        """Mark that a user has attempted this question"""
+        """Mark that a user has attempted this question - CRITICAL for preventing repeat attempts"""
         with self.lock:
             try:
                 data = self._read_data()
                 chat_key = str(chat_id)
                 
                 if chat_key not in data:
+                    logger.error(f"MARK_ATTEMPT_ERROR: No quiz state found for chat {chat_id}")
                     return False
                 
                 quiz_state = data[chat_key]
                 if 'questions' not in quiz_state or question_idx >= len(quiz_state['questions']):
+                    logger.error(f"MARK_ATTEMPT_ERROR: Invalid question index {question_idx} for chat {chat_id}")
                     return False
                 
                 question = quiz_state['questions'][question_idx]
                 if 'attempted_by' not in question:
                     question['attempted_by'] = []
+                    logger.info(f"MARK_ATTEMPT_INIT: Initialized attempted_by list for question {question_idx} in chat {chat_id}")
                 
                 # Ensure consistent data types for storage
                 try:
@@ -249,10 +263,20 @@ class QuizStateManager:
                     
                     if user_id_int not in attempted_by_ints:
                         question['attempted_by'].append(user_id_int)
+                        # CRITICAL: Write data immediately
                         self._write_data(data)
-                        logger.info(f"MARK_ATTEMPT_DEBUG: User {user_id} -> {user_id_int} marked as attempted question {question_idx} in chat {chat_id}. List now: {question['attempted_by']}")
+                        logger.info(f"✓ ATTEMPT RECORDED: User {user_id_int} attempted question {question_idx} in chat {chat_id}. List: {question['attempted_by']}")
+                        
+                        # VERIFICATION: Re-read to confirm write succeeded
+                        verify_data = self._read_data()
+                        verify_list = verify_data[chat_key]['questions'][question_idx].get('attempted_by', [])
+                        if user_id_int in [int(x) for x in verify_list]:
+                            logger.info(f"✓ ATTEMPT VERIFIED: User {user_id_int} confirmed in attempted_by list after write")
+                        else:
+                            logger.error(f"✗ ATTEMPT VERIFICATION FAILED: User {user_id_int} NOT found in list after write! List: {verify_list}")
+                            return False
                     else:
-                        logger.info(f"MARK_ATTEMPT_DEBUG: User {user_id} -> {user_id_int} already in attempted_by list: {question['attempted_by']}")
+                        logger.warning(f"MARK_ATTEMPT_DUPLICATE: User {user_id_int} already in attempted_by list: {question['attempted_by']}")
                 except (ValueError, TypeError) as e:
                     logger.error(f"Data type conversion error in mark_user_attempted_question: {e}, user_id={user_id}, attempted_by={question['attempted_by']}")
                     # Fallback to original logic
@@ -261,11 +285,13 @@ class QuizStateManager:
                         self._write_data(data)
                         logger.info(f"MARK_ATTEMPT_FALLBACK: User {user_id} marked as attempted question {question_idx} in chat {chat_id}. List now: {question['attempted_by']}")
                     else:
-                        logger.info(f"MARK_ATTEMPT_FALLBACK: User {user_id} already in attempted_by list: {question['attempted_by']}")
+                        logger.warning(f"MARK_ATTEMPT_FALLBACK_DUPLICATE: User {user_id} already in attempted_by list: {question['attempted_by']}")
                 
                 return True
             except Exception as e:
-                logger.error(f"Failed to mark user attempt for question {question_idx} in chat {chat_id}: {e}")
+                logger.error(f"CRITICAL ERROR marking user attempt for question {question_idx} in chat {chat_id}: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 return False
     
     def clear_quiz_state(self, chat_id: int) -> None:

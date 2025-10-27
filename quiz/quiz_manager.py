@@ -173,22 +173,32 @@ class QuizManager:
             mode = quiz_state.get('mode', 'multi')
             creator_id = quiz_state.get('creator_id')
             
-            # Check if user has already attempted this question (only in multi mode)
-            if mode == 'multi':
-                already_attempted = self.state_manager.check_user_attempted_question(chat_id, question_idx, user_id)
-                logger.info(f"ATTEMPT CHECK: chat_id={chat_id}, user_id={user_id}, question_idx={question_idx}, mode={mode}, already_attempted={already_attempted}")
-                if already_attempted:
-                    logger.info(f"BLOCKING REPEAT ATTEMPT: User {user_id} already attempted question {question_idx}")
-                    return {
-                        'success': False,
-                        'error': 'You have already attempted this question.',
-                        'error_type': 'already_attempted'
-                    }
+            # CRITICAL: Check if user has already attempted this question
+            # This applies to ALL users in BOTH solo and multi modes
+            already_attempted = self.state_manager.check_user_attempted_question(chat_id, question_idx, user_id)
+            logger.info(f"ATTEMPT CHECK: chat_id={chat_id}, user_id={user_id}, question_idx={question_idx}, mode={mode}, creator_id={creator_id}, already_attempted={already_attempted}")
             
-            # Mark user as having attempted this question (only in multi mode)
-            if mode == 'multi':
-                logger.info(f"MARKING ATTEMPT: chat_id={chat_id}, user_id={user_id}, question_idx={question_idx}")
-                self.state_manager.mark_user_attempted_question(chat_id, question_idx, user_id)
+            if already_attempted:
+                logger.warning(f"BLOCKING REPEAT ATTEMPT: User {user_id} already attempted question {question_idx} in chat {chat_id}")
+                return {
+                    'success': False,
+                    'error': 'You have already attempted this question.',
+                    'error_type': 'already_attempted'
+                }
+            
+            # CRITICAL: Mark user as having attempted this question IMMEDIATELY
+            # This must happen BEFORE any answer processing to prevent race conditions
+            # Applies to ALL users in BOTH solo and multi modes
+            logger.info(f"MARKING ATTEMPT: chat_id={chat_id}, user_id={user_id}, question_idx={question_idx}, mode={mode}")
+            mark_success = self.state_manager.mark_user_attempted_question(chat_id, question_idx, user_id)
+            if not mark_success:
+                logger.error(f"FAILED TO MARK ATTEMPT: User {user_id}, question {question_idx}, chat {chat_id}")
+                return {
+                    'success': False,
+                    'error': 'Failed to record your attempt. Please try again.',
+                    'error_type': 'system_error'
+                }
+            logger.info(f"ATTEMPT MARKED SUCCESSFULLY: User {user_id}, question {question_idx}, chat {chat_id}")
             
             # Check if answer is correct
             correct_answer = question.get('correct_answer', '')
