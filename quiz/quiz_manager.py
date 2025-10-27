@@ -286,8 +286,11 @@ class QuizManager:
             Dictionary with skip results and next actions
         """
         try:
+            logger.info(f"SKIP_DEBUG: skip_question called for chat_id={chat_id}, user_id={user_id}")
+            
             # Check if quiz is active
             if not self.is_quiz_active(chat_id):
+                logger.info(f"SKIP_DEBUG: No active quiz in chat {chat_id}")
                 return {
                     'success': False,
                     'error': 'No active quiz in this chat.',
@@ -317,7 +320,9 @@ class QuizManager:
                 }
             
             # Check permissions based on mode
+            logger.info(f"SKIP_DEBUG: mode={mode}, user_id={user_id}, creator_id={creator_id}")
             if mode == 'solo' and user_id != creator_id:
+                logger.info(f"SKIP_DEBUG: Permission denied - only creator can skip in solo mode")
                 return {
                     'success': False,
                     'error': 'Only the quiz creator can skip questions in solo mode.',
