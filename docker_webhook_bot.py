@@ -2404,12 +2404,15 @@ class SeleniumArchiveBot:
             
             if result['success']:
                 # Prepare result message for next question or final results
+                # Escape username to prevent Markdown parsing errors
+                escaped_username = result['username'].replace('_', '\\_')
+                
                 if result['is_correct']:
                     callback_message = f"✅ Correct! +{result['points_awarded']} point"
-                    result_text = f"✅ {result['username']} got it right!"
+                    result_text = f"✅ {escaped_username} got it right!"
                 else:
                     callback_message = f"❌ Incorrect answer"
-                    result_text = f"❌ {result['username']} was wrong. Answer: {result['correct_answer']}"
+                    result_text = f"❌ {escaped_username} was wrong. Answer: {result['correct_answer']}"
                 
                 self.answer_callback_query(callback_query['id'], callback_message)
                 
