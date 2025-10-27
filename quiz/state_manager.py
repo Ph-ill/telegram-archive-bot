@@ -486,12 +486,16 @@ class QuizStateManager:
         
         return True
     
-    def create_quiz_state_template(self, subject: str, difficulty: str, questions: List[dict]) -> dict:
+    def create_quiz_state_template(self, subject: str, difficulty: str, questions: List[dict], 
+                                 mode: str = 'multi', creator_id: int = None, creator_name: str = None) -> dict:
         """Create a new quiz state template with proper structure"""
         return {
             'active': True,
             'subject': subject,
             'difficulty': difficulty,
+            'mode': mode,  # 'solo' or 'multi'
+            'creator_id': creator_id,
+            'creator_name': creator_name,
             'questions': [self._format_question(q) for q in questions],
             'current_question': 0,
             'scores': {},
@@ -524,6 +528,9 @@ class QuizStateManager:
             'active': quiz_state.get('active', False),
             'subject': quiz_state.get('subject', ''),
             'difficulty': quiz_state.get('difficulty', ''),
+            'mode': quiz_state.get('mode', 'multi'),
+            'creator_id': quiz_state.get('creator_id'),
+            'creator_name': quiz_state.get('creator_name'),
             'total_questions': total_questions,
             'answered_questions': answered_questions,
             'current_question': quiz_state.get('current_question', 0),

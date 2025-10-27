@@ -1935,7 +1935,9 @@ class SeleniumArchiveBot:
         
         try:
             if command == "/quiz_new":
-                return self.handle_quiz_new_command(args, sender_name, chat_id)
+                return self.handle_quiz_new_command(args, sender_name, sender_id, chat_id)
+            elif command == "/quiz_skip":
+                return self.handle_quiz_skip_command(chat_id, sender_id)
             elif command == "/quiz_leaderboard":
                 return self.handle_quiz_leaderboard_command(chat_id)
             elif command == "/quiz_stop":
@@ -1949,43 +1951,50 @@ class SeleniumArchiveBot:
             logger.error(f"Error handling quiz command {command}: {e}")
             return "❌ An error occurred while processing the quiz command. Please try again."
     
-    def handle_quiz_new_command(self, args, sender_name, chat_id):
-        """Handle /quiz_new command"""
+    def handle_quiz_new_command(self, args, sender_name, sender_id, chat_id):
+        """Handle /quiz_new command with new format: mode topic questions difficulty"""
         if not args.strip():
-            return "Please provide quiz parameters.\nFormat: /quiz_new [Subject] [Number] [Difficulty]\nExample: /quiz_new Python Programming 5 medium"
+            return "Please provide quiz parameters.\nFormat: /quiz_new [mode] [topic] [questions] [difficulty]\nExample: /quiz_new multi Python Programming 5 medium\nUse /quiz_help for more details."
         
         # Parse arguments
         parts = args.strip().split()
-        if len(parts) < 1:
-            return "Please provide at least a subject for the quiz.\nExample: /quiz_new Python Programming"
+        if len(parts) < 2:
+            return "Please provide at least mode and topic.\nFormat: /quiz_new [mode] [topic] [questions] [difficulty]\nExample: /quiz_new solo JavaScript 3 easy"
         
-        # Extract subject (everything except last 1-2 parts if they're numbers/difficulty)
-        subject_parts = []
-        num_questions = 5  # default
-        difficulty = "medium"  # default
+        # Extract mode (first parameter)
+        mode = parts[0].lower()
+        if mode not in ['solo', 'multi']:
+            return "Invalid mode. Please use 'solo' or 'multi'.\nExample: /quiz_new multi Python Programming 5 medium"
+        
+        # Extract remaining parameters
+        remaining_parts = parts[1:]
+        
+        # Default values
+        num_questions = 5
+        difficulty = "medium"
         
         # Check if last part is a difficulty level
-        if len(parts) > 1 and parts[-1].lower() in ['easy', 'medium', 'hard', 'expert']:
-            difficulty = parts[-1].lower()
-            parts = parts[:-1]
+        if len(remaining_parts) > 1 and remaining_parts[-1].lower() in ['easy', 'medium', 'hard', 'expert']:
+            difficulty = remaining_parts[-1].lower()
+            remaining_parts = remaining_parts[:-1]
         
         # Check if last part is a number
-        if len(parts) > 1:
+        if len(remaining_parts) > 1:
             try:
-                num_questions = int(parts[-1])
-                parts = parts[:-1]
+                num_questions = int(remaining_parts[-1])
+                remaining_parts = remaining_parts[:-1]
             except ValueError:
-                pass  # Not a number, include in subject
+                pass  # Not a number, include in topic
         
-        # Remaining parts form the subject
-        subject = " ".join(parts)
+        # Remaining parts form the topic
+        topic = " ".join(remaining_parts)
         
         # Create quiz UI instance
         from quiz.quiz_ui import QuizUI
         quiz_ui = QuizUI(self)
         
-        # Create the quiz
-        result = self.quiz_manager.create_quiz(chat_id, subject, num_questions, difficulty)
+        # Create the quiz with mode and creator info
+        result = self.quiz_manager.create_quiz(chat_id, topic, num_questions, difficulty, mode, sender_id, sender_name)
         
         if result['success']:
             # Quiz created successfully, send first question
@@ -2024,6 +2033,40 @@ class SeleniumArchiveBot:
             quiz_ui = QuizUI(self)
             return quiz_ui.format_error_message(result['error_type'], result['error'])
     
+    def handle_quiz_skip_command(self, chat_id, sender_id):
+        """Handle /quiz_skip command"""
+        try:
+            result = self.quiz_manager.skip_question(chat_id, sender_id)
+            
+            if result['success']:
+                from quiz.quiz_ui import QuizUI
+                quiz_ui = QuizUI(self)
+                
+                if result.get('quiz_complete'):
+                    # Quiz completed after skip
+                    final_leaderboard = result.get('final_leaderboard', {})
+                    if final_leaderboard.get('success'):
+                        quiz_ui.send_final_results(chat_id, final_leaderboard['leaderboard'], 
+                                                 final_leaderboard['quiz_info'])
+                    return None
+                elif result.get('next_question'):
+                    # Show next question
+                    next_question = result['next_question']
+                    quiz_status = self.quiz_manager.get_quiz_status(chat_id)
+                    current_q_num = quiz_status.get('answered_questions', 0) + 1
+                    total_questions = quiz_status.get('total_questions', 0)
+                    skip_message = f"⏭️ Question skipped by {result.get('username', 'Unknown')}"
+                    quiz_ui.send_question(chat_id, next_question, current_q_num, total_questions, skip_message)
+                    return None
+                else:
+                    return result.get('message', 'Question skipped successfully.')
+            else:
+                return result.get('error', 'Failed to skip question.')
+                
+        except Exception as e:
+            logger.error(f"Error handling quiz skip command: {e}")
+            return "❌ An error occurred while skipping the question."
+
     def handle_quiz_stop_command(self, chat_id):
         """Handle /quiz_stop command"""
         try:

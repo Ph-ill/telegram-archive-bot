@@ -32,7 +32,8 @@ class QuizManager:
         
         logger.info("QuizManager initialized successfully")
     
-    def create_quiz(self, chat_id: int, subject: str, num_questions: int, difficulty: str) -> Dict[str, Any]:
+    def create_quiz(self, chat_id: int, subject: str, num_questions: int, difficulty: str, 
+                   mode: str, creator_id: int, creator_name: str) -> Dict[str, Any]:
         """
         Create a new quiz for the specified chat
         
@@ -41,6 +42,9 @@ class QuizManager:
             subject: Quiz subject/topic
             num_questions: Number of questions to generate
             difficulty: Difficulty level (easy, medium, hard, expert)
+            mode: Quiz mode ('solo' or 'multi')
+            creator_id: User ID of quiz creator
+            creator_name: Username of quiz creator
             
         Returns:
             Dictionary with success status and message/error details
@@ -87,8 +91,8 @@ class QuizManager:
                     'error_type': 'api_error'
                 }
             
-            # Create quiz state
-            quiz_state = self.state_manager.create_quiz_state_template(subject, difficulty, questions)
+            # Create quiz state with mode and creator info
+            quiz_state = self.state_manager.create_quiz_state_template(subject, difficulty, questions, mode, creator_id, creator_name)
             
             # Validate quiz state
             if not self.state_manager.validate_quiz_state(quiz_state):
@@ -165,16 +169,21 @@ class QuizManager:
             
             question = questions[question_idx]
             
-            # Check if user has already attempted this question
-            if self.state_manager.check_user_attempted_question(chat_id, user_id, question_idx):
+            # Get quiz mode and creator info
+            mode = quiz_state.get('mode', 'multi')
+            creator_id = quiz_state.get('creator_id')
+            
+            # Check if user has already attempted this question (only in multi mode)
+            if mode == 'multi' and self.state_manager.check_user_attempted_question(chat_id, user_id, question_idx):
                 return {
                     'success': False,
                     'error': 'You have already attempted this question.',
                     'error_type': 'already_attempted'
                 }
             
-            # Mark user as having attempted this question
-            self.state_manager.mark_user_attempted_question(chat_id, question_idx, user_id)
+            # Mark user as having attempted this question (only in multi mode)
+            if mode == 'multi':
+                self.state_manager.mark_user_attempted_question(chat_id, question_idx, user_id)
             
             # Check if answer is correct
             correct_answer = question.get('correct_answer', '')
@@ -189,19 +198,33 @@ class QuizManager:
                 'question_idx': question_idx
             }
             
+            # Always record the answer for scoring purposes
             if is_correct:
-                # Award points and mark question as answered
                 self.state_manager.update_scores(chat_id, user_id, username, 1)
-                self.state_manager.mark_question_answered(chat_id, question_idx, answer)
                 result['points_awarded'] = 1
                 logger.info(f"User {username} ({user_id}) answered question {question_idx} correctly in chat {chat_id}")
+            else:
+                result['points_awarded'] = 0
+                logger.info(f"User {username} ({user_id}) answered question {question_idx} incorrectly in chat {chat_id}")
+            
+            # Determine if quiz should advance based on mode
+            should_advance = False
+            current_question = quiz_state.get('current_question', 0)
+            
+            if question_idx == current_question:
+                if mode == 'solo':
+                    # In solo mode, advance only if the creator answered (correct or incorrect)
+                    should_advance = (user_id == creator_id)
+                    logger.info(f"Solo mode: user_id={user_id}, creator_id={creator_id}, should_advance={should_advance}")
+                elif mode == 'multi':
+                    # In multi mode, advance only if someone answered correctly
+                    should_advance = is_correct
+                    logger.info(f"Multi mode: is_correct={is_correct}, should_advance={should_advance}")
                 
-                # Check if quiz is complete
-                current_question = quiz_state.get('current_question', 0)
-                logger.info(f"Question {question_idx} answered, current_question={current_question}")
-                
-                if question_idx == current_question:
-                    # This was the current question, advance to next
+                if should_advance:
+                    # Mark question as answered and advance
+                    self.state_manager.mark_question_answered(chat_id, question_idx, answer)
+                    
                     logger.info(f"Attempting to advance to next question for chat {chat_id}")
                     if self.state_manager.advance_to_next_question(chat_id):
                         # More questions available
@@ -229,12 +252,12 @@ class QuizManager:
                         }
                         logger.info(f"Quiz completion result for chat {chat_id}: {result['quiz_complete']}")
                 else:
-                    logger.warning(f"Question {question_idx} answered but current_question is {current_question}")
+                    # Don't advance - stay on current question
+                    result['quiz_complete'] = False
+                    logger.info(f"Not advancing question for chat {chat_id} (mode={mode}, should_advance={should_advance})")
             else:
-                # Incorrect answer - don't advance question
-                result['points_awarded'] = 0
+                logger.warning(f"Question {question_idx} answered but current_question is {current_question}")
                 result['quiz_complete'] = False
-                logger.info(f"User {username} ({user_id}) answered question {question_idx} incorrectly in chat {chat_id}")
             
             return result
             
@@ -246,6 +269,101 @@ class QuizManager:
                 'error_type': 'system_error'
             }
     
+    def skip_question(self, chat_id: int, user_id: int) -> Dict[str, Any]:
+        """
+        Skip the current question (only allowed if everyone got it wrong in multi mode, or anytime in solo mode)
+        
+        Args:
+            chat_id: Telegram chat ID
+            user_id: User ID requesting the skip
+            
+        Returns:
+            Dictionary with skip results and next actions
+        """
+        try:
+            # Check if quiz is active
+            if not self.is_quiz_active(chat_id):
+                return {
+                    'success': False,
+                    'error': 'No active quiz in this chat.',
+                    'error_type': 'no_quiz'
+                }
+            
+            # Load quiz state
+            quiz_state = self.state_manager.load_quiz_state(chat_id)
+            if not quiz_state:
+                return {
+                    'success': False,
+                    'error': 'Failed to load quiz state.',
+                    'error_type': 'state_error'
+                }
+            
+            mode = quiz_state.get('mode', 'multi')
+            creator_id = quiz_state.get('creator_id')
+            current_question_idx = quiz_state.get('current_question', 0)
+            questions = quiz_state.get('questions', [])
+            
+            # Validate current question
+            if current_question_idx >= len(questions):
+                return {
+                    'success': False,
+                    'error': 'No current question to skip.',
+                    'error_type': 'invalid_question'
+                }
+            
+            # Check permissions based on mode
+            if mode == 'solo' and user_id != creator_id:
+                return {
+                    'success': False,
+                    'error': 'Only the quiz creator can skip questions in solo mode.',
+                    'error_type': 'permission_denied'
+                }
+            
+            # Get username for the skip message
+            username = 'Unknown'
+            scores = quiz_state.get('scores', {})
+            for uid, user_data in scores.items():
+                if int(uid) == user_id:
+                    username = user_data.get('username', 'Unknown')
+                    break
+            
+            # Mark current question as answered (skipped)
+            self.state_manager.mark_question_answered(chat_id, current_question_idx, "SKIPPED")
+            
+            # Advance to next question
+            if self.state_manager.advance_to_next_question(chat_id):
+                # More questions available
+                next_question = self.get_current_question(chat_id)
+                return {
+                    'success': True,
+                    'next_question': next_question,
+                    'quiz_complete': False,
+                    'username': username,
+                    'message': f'Question skipped by {username}.'
+                }
+            else:
+                # Quiz is complete
+                final_results = self.stop_quiz(chat_id, record_win=True)
+                return {
+                    'success': True,
+                    'quiz_complete': True,
+                    'final_leaderboard': {
+                        'success': final_results['success'],
+                        'leaderboard': final_results.get('final_leaderboard', []),
+                        'quiz_info': final_results.get('quiz_info', {})
+                    },
+                    'username': username,
+                    'message': f'Quiz completed after skip by {username}.'
+                }
+                
+        except Exception as e:
+            logger.error(f"Error skipping question for chat {chat_id}: {e}")
+            return {
+                'success': False,
+                'error': 'An error occurred while skipping the question.',
+                'error_type': 'system_error'
+            }
+
     def get_leaderboard(self, chat_id: int) -> Dict[str, Any]:
         """
         Get leaderboard - current quiz if active, otherwise persistent leaderboard
@@ -491,41 +609,57 @@ class QuizManager:
         return """🎯 <b>Quiz Commands Help</b>
 
 <blockquote expandable><b>Start a New Quiz:</b>
-<code>/quiz_new [Subject] [Number] [Difficulty]</code>
+<code>/quiz_new [mode] [topic] [questions] [difficulty]</code>
 
-• <b>Subject</b>: Topic for the quiz (required)
-• <b>Number</b>: Number of questions (1-20, default: 5)
+• <b>Mode</b>: solo or multi (required)
+• <b>Topic</b>: Subject for the quiz (required)
+• <b>Questions</b>: Number of questions (1-20, default: 5)
 • <b>Difficulty</b>: easy, medium, hard, expert (default: medium)
 
 <b>Examples:</b>
-• <code>/quiz_new World History 10 hard</code>
-• <code>/quiz_new Python Programming 5</code>
-• <code>/quiz_new Science</code>
+• <code>/quiz_new multi World History 10 hard</code>
+• <code>/quiz_new solo Python Programming 5 medium</code>
+• <code>/quiz_new multi Science</code>
 
 <b>Other Commands:</b>
 • <code>/quiz_leaderboard</code> - Show current scores
 • <code>/quiz_stop</code> - End the current quiz
+• <code>/quiz_skip</code> - Skip current question (conditions apply)
 • <code>/quiz_help</code> - Show this help message
 
+<b>Quiz Modes:</b>
+
+<b>🎯 Solo Mode:</b>
+• Quiz creator controls progression
+• Anyone can answer and earn points
+• Quiz advances only when creator answers (right or wrong)
+• Creator can skip questions anytime with <code>/quiz_skip</code>
+• Final results show everyone's scores
+
+<b>👥 Multi Mode:</b>
+• Traditional competitive mode
+• Each player gets one attempt per question
+• Quiz advances only when someone answers correctly
+• If everyone gets it wrong, anyone can use <code>/quiz_skip</code>
+• First correct answer wins the point
+
 <b>How to Play:</b>
-1. Someone starts a quiz with <code>/quiz_new</code>
+1. Someone starts a quiz with <code>/quiz_new [mode] [topic]</code>
 2. Questions appear with answer options (A, B, C, D) and buttons
-3. Each player gets <b>one attempt per question</b>
-4. Click your chosen answer button (🔘 A, 🔘 B, etc.)
-5. Wrong answers are acknowledged but question stays active
-6. <b>First correct answer wins the point</b> and advances to next question
-7. View scores anytime with <code>/quiz_leaderboard</code>
+3. Click your chosen answer button
+4. Quiz progression depends on the mode selected
+5. View scores anytime with <code>/quiz_leaderboard</code>
 
 <b>Rules:</b>
 • Only one quiz per chat at a time
-• One attempt per player per question (no spam clicking!)
-• First person to answer correctly gets the point
-• Question advances only when someone answers correctly
+• In multi mode: one attempt per player per question
+• In solo mode: unlimited attempts, but only creator advances quiz
 • Quiz ends when all questions are answered or someone uses <code>/quiz_stop</code>
 
 <b>Strategy Tips:</b>
-• Read the question and all options carefully
-• You only get one shot per question, so choose wisely!
-• Speed matters - first correct answer wins
+• Choose your mode based on group preference
+• Solo mode is great for learning/practice
+• Multi mode is perfect for competition
+• Read questions carefully - you might only get one shot!
 
 Have fun! 🎉</blockquote>"""
