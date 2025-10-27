@@ -174,15 +174,20 @@ class QuizManager:
             creator_id = quiz_state.get('creator_id')
             
             # Check if user has already attempted this question (only in multi mode)
-            if mode == 'multi' and self.state_manager.check_user_attempted_question(chat_id, user_id, question_idx):
-                return {
-                    'success': False,
-                    'error': 'You have already attempted this question.',
-                    'error_type': 'already_attempted'
-                }
+            if mode == 'multi':
+                already_attempted = self.state_manager.check_user_attempted_question(chat_id, user_id, question_idx)
+                logger.info(f"ATTEMPT CHECK: chat_id={chat_id}, user_id={user_id}, question_idx={question_idx}, mode={mode}, already_attempted={already_attempted}")
+                if already_attempted:
+                    logger.info(f"BLOCKING REPEAT ATTEMPT: User {user_id} already attempted question {question_idx}")
+                    return {
+                        'success': False,
+                        'error': 'You have already attempted this question.',
+                        'error_type': 'already_attempted'
+                    }
             
             # Mark user as having attempted this question (only in multi mode)
             if mode == 'multi':
+                logger.info(f"MARKING ATTEMPT: chat_id={chat_id}, user_id={user_id}, question_idx={question_idx}")
                 self.state_manager.mark_user_attempted_question(chat_id, question_idx, user_id)
             
             # Check if answer is correct

@@ -2398,7 +2398,9 @@ class SeleniumArchiveBot:
             selected_answer = options[option_idx]
             
             # Process the answer
+            logger.info(f"Processing answer: chat_id={chat_id}, user_id={user_id}, username={username}, question_idx={question_idx}, selected_answer={selected_answer}")
             result = self.quiz_manager.process_answer(chat_id, user_id, username, question_idx, selected_answer)
+            logger.info(f"Answer processing result: {result}")
             
             if result['success']:
                 # Prepare result message for next question or final results
