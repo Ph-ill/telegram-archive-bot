@@ -206,7 +206,9 @@ class QuizStateManager:
                 question = quiz_state['questions'][question_idx]
                 attempted_by = question.get('attempted_by', [])
                 
-                return user_id in attempted_by
+                result = user_id in attempted_by
+                logger.info(f"CHECK_ATTEMPT_DEBUG: chat_id={chat_id}, user_id={user_id}, question_idx={question_idx}, attempted_by={attempted_by}, result={result}")
+                return result
             except Exception as e:
                 logger.error(f"Failed to check user attempt for question {question_idx} in chat {chat_id}: {e}")
                 return False
@@ -232,7 +234,9 @@ class QuizStateManager:
                 if user_id not in question['attempted_by']:
                     question['attempted_by'].append(user_id)
                     self._write_data(data)
-                    logger.debug(f"User {user_id} marked as attempted question {question_idx} in chat {chat_id}")
+                    logger.info(f"MARK_ATTEMPT_DEBUG: User {user_id} marked as attempted question {question_idx} in chat {chat_id}. List now: {question['attempted_by']}")
+                else:
+                    logger.info(f"MARK_ATTEMPT_DEBUG: User {user_id} already in attempted_by list: {question['attempted_by']}")
                 
                 return True
             except Exception as e:
