@@ -629,6 +629,17 @@ class QuizUI:
                 message += f"❓ <b>Questions:</b> {total_questions}\n"
                 message += f"👥 <b>Participants:</b> {len(leaderboard_data)}\n"
             
+            # Score summary for all participants (show before question breakdown)
+            if leaderboard_data and quiz_info.get('total_questions', 0) > 0:
+                message += f"\n📋 <b>Score Summary:</b>\n"
+                for i, player in enumerate(leaderboard_data):
+                    rank = i + 1
+                    username = html.escape(player.get('username', 'Unknown'))
+                    correct = player.get('points', 0)
+                    incorrect = quiz_info.get('total_questions', 0) - correct
+                    
+                    message += f"{rank}. <b>{username}</b>: {correct}✅ {incorrect}❌\n"
+            
             # Question-by-question breakdown with correct answers and who got them right/wrong
             if questions and leaderboard_data:
                 message += f"\n📝 <b>Question Breakdown:</b>\n"
@@ -660,17 +671,6 @@ class QuizUI:
                     # If no one attempted
                     if not correct_users and not incorrect_users:
                         message += f"<i>No one attempted this question</i>\n"
-            
-            # Detailed breakdown for all participants (summary)
-            if leaderboard_data and quiz_info.get('total_questions', 0) > 0:
-                message += f"\n📋 <b>Score Summary:</b>\n"
-                for i, player in enumerate(leaderboard_data):
-                    rank = i + 1
-                    username = html.escape(player.get('username', 'Unknown'))
-                    correct = player.get('points', 0)
-                    incorrect = quiz_info.get('total_questions', 0) - correct
-                    
-                    message += f"{rank}. <b>{username}</b>: {correct}✅ {incorrect}❌\n"
             
             message += "\n🎉 Thanks for playing! Use /quiz_new to start another quiz!"
             message += "</blockquote>"
