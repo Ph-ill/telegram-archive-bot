@@ -204,7 +204,7 @@ class QuizUI:
             response = self.bot_instance.send_message(
                 chat_id=chat_id,
                 text=message_text,
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             
             if response and 'message_id' in response:
@@ -363,28 +363,34 @@ class QuizUI:
         Returns:
             Formatted leaderboard message
         """
+        import html
+        
+        # Use blockquote expandable for leaderboards
+        message = "<blockquote expandable>"
+        
         if is_persistent:
-            title = "🏆 **All-Time Quiz Champions**"
+            title = "🏆 <b>All-Time Quiz Champions</b>"
         elif is_final:
-            title = "🏆 **Final Results**"
+            title = "🏆 <b>Final Results</b>"
         else:
-            title = "📊 **Current Leaderboard**"
+            title = "📊 <b>Current Leaderboard</b>"
         
-        message = f"{title}\n\n"
+        message += f"{title}\n"
         
         if is_persistent:
-            message += "**Top quiz winners across all games**\n\n"
+            message += "<b>Top quiz winners across all games</b>\n"
         else:
             # Add quiz info for current/final quiz
-            subject = quiz_info.get('subject', 'Unknown')
+            subject = html.escape(quiz_info.get('subject', 'Unknown'))
             difficulty = quiz_info.get('difficulty', 'medium')
             total_questions = quiz_info.get('total_questions', 0)
             answered_questions = quiz_info.get('answered_questions', 0)
             
-            message += f"**Quiz:** {subject} ({difficulty.title()})\n"
+            message += f"<b>Quiz:</b> {subject} ({difficulty.title()})\n"
             if not is_final:
-                message += f"**Progress:** {answered_questions}/{total_questions} questions\n"
-            message += "\n"
+                message += f"<b>Progress:</b> {answered_questions}/{total_questions} questions\n"
+        
+        message += "\n"
         
         # Add leaderboard
         if not leaderboard_data:
@@ -398,7 +404,7 @@ class QuizUI:
             
             for i, player in enumerate(leaderboard_data):
                 rank = i + 1
-                username = self._escape_markdown_username(player.get('username', 'Unknown'))
+                username = html.escape(player.get('username', 'Unknown'))
                 
                 if is_persistent:
                     # Show quiz wins and win rate for persistent leaderboard
@@ -408,9 +414,9 @@ class QuizUI:
                     
                     if rank <= 3 and len(leaderboard_data) > 1:
                         medal = medals[rank - 1]
-                        message += f"{medal} **{rank}.** {username}\n"
+                        message += f"{medal} <b>{rank}.</b> {username}\n"
                     else:
-                        message += f"**{rank}.** {username}\n"
+                        message += f"<b>{rank}.</b> {username}\n"
                     
                     message += f"    🏆 {quiz_wins} wins • 📊 {win_rate}% win rate • ⭐ {total_points} total points\n"
                 else:
@@ -419,15 +425,16 @@ class QuizUI:
                     
                     if rank <= 3 and len(leaderboard_data) > 1:
                         medal = medals[rank - 1]
-                        message += f"{medal} **{rank}.** {username} - {points} points\n"
+                        message += f"{medal} <b>{rank}.</b> {username} - {points} points\n"
                     else:
-                        message += f"**{rank}.** {username} - {points} points\n"
+                        message += f"<b>{rank}.</b> {username} - {points} points\n"
         
         if is_final:
             message += "\n🎉 Thanks for playing!"
         elif is_persistent:
             message += "\n💡 Win quizzes to climb the leaderboard!"
         
+        message += "</blockquote>"
         return message
     
     def _create_question_keyboard(self, chat_id: int, question_idx: int, options: List[str]) -> Dict[str, Any]:
