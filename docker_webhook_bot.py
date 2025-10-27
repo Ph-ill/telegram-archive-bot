@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+⏭️ Question skipped by Unknown#!/usr/bin/env python3
 """
 Selenium-based Archive Bot - Actually creates new archives by automating browser
 """
@@ -1937,7 +1937,7 @@ class SeleniumArchiveBot:
             if command == "/quiz_new":
                 return self.handle_quiz_new_command(args, sender_name, sender_id, chat_id)
             elif command == "/quiz_skip":
-                return self.handle_quiz_skip_command(chat_id, sender_id)
+                return self.handle_quiz_skip_command(chat_id, sender_id, sender_name)
             elif command == "/quiz_leaderboard":
                 return self.handle_quiz_leaderboard_command(chat_id)
             elif command == "/quiz_stop":
@@ -2033,10 +2033,10 @@ class SeleniumArchiveBot:
             quiz_ui = QuizUI(self)
             return quiz_ui.format_error_message(result['error_type'], result['error'])
     
-    def handle_quiz_skip_command(self, chat_id, sender_id):
+    def handle_quiz_skip_command(self, chat_id, sender_id, sender_name):
         """Handle /quiz_skip command"""
         try:
-            result = self.quiz_manager.skip_question(chat_id, sender_id)
+            result = self.quiz_manager.skip_question(chat_id, sender_id, sender_name)
             
             if result['success']:
                 from quiz.quiz_ui import QuizUI

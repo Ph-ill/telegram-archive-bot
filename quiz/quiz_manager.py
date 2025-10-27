@@ -274,7 +274,7 @@ class QuizManager:
                 'error_type': 'system_error'
             }
     
-    def skip_question(self, chat_id: int, user_id: int) -> Dict[str, Any]:
+    def skip_question(self, chat_id: int, user_id: int, username: str = None) -> Dict[str, Any]:
         """
         Skip the current question (only allowed if everyone got it wrong in multi mode, or anytime in solo mode)
         
@@ -330,12 +330,13 @@ class QuizManager:
                 }
             
             # Get username for the skip message
-            username = 'Unknown'
-            scores = quiz_state.get('scores', {})
-            for uid, user_data in scores.items():
-                if int(uid) == user_id:
-                    username = user_data.get('username', 'Unknown')
-                    break
+            if not username:
+                username = 'Unknown'
+                scores = quiz_state.get('scores', {})
+                for uid, user_data in scores.items():
+                    if int(uid) == user_id:
+                        username = user_data.get('username', 'Unknown')
+                        break
             
             # Mark current question as answered (skipped)
             self.state_manager.mark_question_answered(chat_id, current_question_idx, "SKIPPED")
