@@ -538,10 +538,7 @@ class SalamagotchiManager:
                 html.escape(self._build_activity_phrase(pet)),
             ])
 
-        lines.extend([
-            "",
-            f"<pre>{html.escape(self._render_stage_art(pet, stage))}</pre>",
-        ])
+        lines.append(f"<pre>{html.escape(self._render_stage_art(pet, stage))}</pre>")
 
         hint_lines = self._build_hint_lines(pet) if pet.get("alive") else [
             f"{safe_name} died of {html.escape(pet.get('death_reason', 'unknown causes'))}.",
