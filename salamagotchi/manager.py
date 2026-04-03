@@ -52,15 +52,14 @@ STAGES: List[Dict[str, Any]] = [
         "min_age": 0,
         "max_age": 2,
         "art": r"""
-      .-~~~~-.
-    .'  __    '.
-   /   /  \     \
-  |   | EYES |    |
-  |   |  ^^  |    |
-  |   | MOUTH|    |
-   \   \____/    /
-    '.        .'
-      '-.__.-'
+       .-'''-.
+     .'  _  _ '.
+    /   ( EYE ) \
+   |      ^      |
+   |    (MTH)    |
+    \           /
+     '.       .'
+       '.___.'
 """.strip("\n"),
     },
     {
@@ -68,15 +67,15 @@ STAGES: List[Dict[str, Any]] = [
         "min_age": 3,
         "max_age": 6,
         "art": r"""
-      .-======-.
-    .'  .--.    '.
-   /   /    \     \
-  |   | EYES |     |
-  |   |  ^^  |     |
-  |   | MOUTH|     |
-   \   \____/     /
-    '.        _.'
-      '-.__.-'
+       .-''''-.
+     .'  __ __ '.
+    /   ( EYE )  \
+   |      ^^      |
+   |    (MTH)     |
+   |              |
+    \            /
+     '.        .'
+       '------'
 """.strip("\n"),
     },
     {
@@ -84,16 +83,15 @@ STAGES: List[Dict[str, Any]] = [
         "min_age": 7,
         "max_age": 13,
         "art": r"""
-       .-======-.
-     .'  .--.    '.
-    /   /    \     \
-   |   | EYES |     |
-   |   |  /\  |     |
-   |   | MOUTH|     |
-   |    \____/     /|
-    \            .' /
-     '._      _.-'
-        '----'
+        .-''''-.
+      .'  __ __ '.
+     /   ( EYE )  \
+    |      ^^      |
+    |     /  \     |
+    |    (MTH)     |
+     \            /
+      '.        .'
+        '------'
 """.strip("\n"),
     },
     {
@@ -101,16 +99,15 @@ STAGES: List[Dict[str, Any]] = [
         "min_age": 14,
         "max_age": 29,
         "art": r"""
-        .-======-.
-      .'  .--.    '.
-     /   /    \     \
-    |   | EYES |     |
-    |   |  --  |     |
-    |   | MOUTH|     |
-    |    \____/     /|
-     \            .' /
-      '._      _.-'
-         '----'
+        .-''''''-.
+      .'  __  __  '.
+     /   (  EYE  )  \
+    |       --       |
+    |      /__\      |
+    |      (MTH)     |
+     \              /
+      '.          .'
+        '--------'
 """.strip("\n"),
     },
     {
@@ -118,16 +115,16 @@ STAGES: List[Dict[str, Any]] = [
         "min_age": 30,
         "max_age": 59,
         "art": r"""
-         .-========-.
-       .'   .--.     '.
-      /    /    \      \
-     |    | EYES |      |
-     |    |  --  |      |
-     |    | MOUTH|      |
-     |     \____/      /|
-      \              .' /
-       '._        _.-'
-          '------'
+         .-''''''-.
+       .'  _    _  '.
+      /   ( EYE  )   \
+     |       --       |
+     |      |  |      |
+     |      (MTH)     |
+     |                |
+      \              /
+       '.          .'
+         '--------'
 """.strip("\n"),
     },
     {
@@ -135,17 +132,16 @@ STAGES: List[Dict[str, Any]] = [
         "min_age": 60,
         "max_age": 999999,
         "art": r"""
-          .-========-.
-        .'   .--.     '.
-       /    /    \      \
-      |    | EYES |      |
-      |    |  ..  |      |
-      |    | MOUTH|      |
-      |    | \__/ |      |
-      |     \____/      /|
-       \              .' /
-        '._        _.-'
-           '------'
+          .-''''''-.
+        .'  _    _  '.
+       /   ( EYE  )   \
+      |       ..       |
+      |      |__|      |
+      |      (MTH)     |
+      |       __       |
+       \              /
+        '.          .'
+          '--------'
 """.strip("\n"),
     },
 ]
@@ -278,29 +274,29 @@ class SalamagotchiManager:
         )
 
         if not pet.get("alive", True):
-            eyes = "xx xx"
-            mouth = "_____"
+            eyes = "x x"
+            mouth = "___"
         elif unmet_needs >= 3:
-            eyes = ";; ;;"
-            mouth = "\\___/"
+            eyes = "; ;"
+            mouth = "___"
         elif unmet_needs == 2:
-            eyes = "-- --"
-            mouth = "\\_-_/"
+            eyes = "- -"
+            mouth = "_._"
         elif unmet_needs == 1:
-            eyes = "oo oo"
-            mouth = "\\_._/"
+            eyes = "o o"
+            mouth = "._."
         else:
-            eyes = "^^ ^^"
-            mouth = "\\___/"
+            eyes = "^ ^"
+            mouth = "\\_/"
 
         lines = (
             stage["art"]
-            .replace("EYES ", eyes)
-            .replace("MOUTH", mouth)
+            .replace("EYE", eyes)
+            .replace("MTH", mouth)
             .splitlines()
         )
 
-        poop_pile = " /^^\\ "
+        poop_pile = " /~\\ "
         bottom_left = poop_pile if scoop_remaining >= 1 else "      "
         bottom_right = poop_pile if scoop_remaining >= 2 else "      "
 
