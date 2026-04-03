@@ -52,11 +52,14 @@ STAGES: List[Dict[str, Any]] = [
         "min_age": 0,
         "max_age": 2,
         "art": r"""
-   .-^-.
- .' o o '.
-/    ^    \
-\  \___/  /
- '.___.'
+      .-====-.
+    .'  .-.  '.
+   /   (o o)   \
+  |      ^      |
+  |   \_____/   |
+   \           /
+    '._     _.'
+       '---'
 """.strip("\n"),
     },
     {
@@ -64,11 +67,14 @@ STAGES: List[Dict[str, Any]] = [
         "min_age": 3,
         "max_age": 6,
         "art": r"""
-   __
-  / .\_
-  \__/ )
-  /  _/
- /__/~
+      .--.____.--.
+    .'  / .  . \  '.
+   /   |  ()()  |   \
+  |    |   ^^   |    |
+  |    |  \__/  |    |
+   \    \      /    /
+    '._  '----'  _.'
+       '--.__.--'
 """.strip("\n"),
     },
     {
@@ -76,13 +82,15 @@ STAGES: List[Dict[str, Any]] = [
         "min_age": 7,
         "max_age": 13,
         "art": r"""
-   __     __
- _(  \.-./  )_
-(   _     _   )
- | /o\   /o\ |
- |     ^     |
-  \  '---'  /
-   '-.___.-'
+       __..--..__
+    .-'  _    _  '-.
+   /   .'o\  /o'.   \
+  |   /   .--.   \   |
+  |   |  (____)  |   |
+  |   \   '--'   /   |
+   \   '._    _.'   /
+    '._    '--'  _.'
+       '--.__.--'
 """.strip("\n"),
     },
     {
@@ -90,14 +98,15 @@ STAGES: List[Dict[str, Any]] = [
         "min_age": 14,
         "max_age": 29,
         "art": r"""
-      __..__
-  _.-'  ..  '-._
- /  _.-'  '-._  \
-|  /  o    o  \  |
-| |      __    | |
-|  \_.-'  '-._/  |
- \      __      /
-  '-._.'  '._.-'
+        _.------._
+     .-'  .--.    '-.
+    /   .' o  '.     \
+   |   /  .--.  \     |
+   |   | (____) |     |
+   |   \  '--'  /     |
+    \   '.___.'     .'
+     '._         _.'
+        '-------'
 """.strip("\n"),
     },
     {
@@ -105,15 +114,16 @@ STAGES: List[Dict[str, Any]] = [
         "min_age": 30,
         "max_age": 59,
         "art": r"""
-        __
-   _.-''  ''-._
- .'  .--..--.  '.
-/   /  o  o  \   \
-|   |    ..   |   |
-|   |  .____. |   |
-\   \  \____/ /  /
- '.  '._.___.' .'
-   '-._\__/_.-'
+         _.--------._
+      .-'  .----.    '-.
+     /   .' o  o '.     \
+    |   /    ..    \     |
+    |   |  .____.  |     |
+    |   | (______) |     |
+    |   \   '--'   /     |
+     \   '._    _.'    .'
+      '._   '=='   _.-'
+         '--------'
 """.strip("\n"),
     },
     {
@@ -121,17 +131,17 @@ STAGES: List[Dict[str, Any]] = [
         "min_age": 60,
         "max_age": 999999,
         "art": r"""
-        ____ 
-   _.-'' __ ''-._
- .'   .-'  '-.   '.
-/   .'  o  o  '.   \
-|  /   .-^^-.   \  |
-|  |  /  __  \  |  |
-|  |  \_/  \_/  |  |
-\   '.  ----  .'  /
- '.   '-.__.-'   .'
-   '-._  __  _.-'
-       ''  ''
+          _.--------._
+       .-'  .----.    '-.
+      /   .' o  o '.     \
+     |   /   .--.   \     |
+     |   |  /_  _\  |     |
+     |   |  \_)(_/  |     |
+     |   |   /__\   |     |
+     |   \   '--'   /     |
+      \   '._    _.'    .'
+       '._   '=='   _.-'
+          '--------'
 """.strip("\n"),
     },
 ]
@@ -252,6 +262,35 @@ class SalamagotchiManager:
 
         return f"{name} is feeling {self._join_phrases(phrases)} today."
 
+    def _render_stage_art(self, pet: Dict[str, Any], stage: Dict[str, Any]) -> str:
+        lines = stage["art"].splitlines()
+
+        feed_remaining = max(0, REQUIREMENTS["feed"] - pet.get("feed_count", 0))
+        scoop_remaining = max(0, REQUIREMENTS["scoop"] - pet.get("scoop_count", 0))
+        play_remaining = max(0, REQUIREMENTS["play"] - pet.get("play_count", 0))
+        wash_remaining = max(0, REQUIREMENTS["wash"] - pet.get("wash_count", 0))
+
+        top_left = "  zZz" if not pet.get("alive", True) else ("  !!!" if feed_remaining == 2 else "   ! " if feed_remaining == 1 else "     ")
+        top_right = " xx " if not pet.get("alive", True) else (" ~~~ " if scoop_remaining > 0 or wash_remaining > 0 else " *** " if play_remaining == 0 and feed_remaining == 0 else "     ")
+        middle_left = " stink" if scoop_remaining == 2 else "  whf " if scoop_remaining == 1 else "      "
+        middle_right = " bored" if play_remaining > 0 else " clean" if wash_remaining == 0 and scoop_remaining == 0 else "      "
+        bottom_left = " poop " if scoop_remaining == 2 else "  o   " if scoop_remaining == 1 else "      "
+        bottom_right = " bath?" if wash_remaining > 0 else " happy" if pet.get("alive", True) and feed_remaining == 0 and play_remaining == 0 else "      "
+
+        decorated = []
+        for idx, line in enumerate(lines):
+            left = "      "
+            right = "      "
+            if idx == 0:
+                left, right = top_left, top_right
+            elif idx == len(lines) // 2:
+                left, right = middle_left, middle_right
+            elif idx == len(lines) - 1:
+                left, right = bottom_left, bottom_right
+            decorated.append(f"{left} {line:<22} {right}".rstrip())
+
+        return "\n".join(decorated)
+
     def _build_hint_lines(self, pet: Dict[str, Any]) -> List[str]:
         lines: List[str] = []
         name = pet["name"]
@@ -287,7 +326,7 @@ class SalamagotchiManager:
             f"<b>Age:</b> {pet.get('age_days', 0)} day{'s' if pet.get('age_days', 0) != 1 else ''}",
             f"<b>Stage:</b> {html.escape(stage['name'])}",
             "",
-            f"<pre>{html.escape(stage['art'])}</pre>",
+            f"<pre>{html.escape(self._render_stage_art(pet, stage))}</pre>",
         ]
 
         hint_lines = self._build_hint_lines(pet) if pet.get("alive") else [
