@@ -8,6 +8,7 @@ import html
 import json
 import logging
 import os
+import random
 import threading
 from copy import deepcopy
 from datetime import datetime, timedelta
@@ -155,6 +156,112 @@ STAGE_EMOJIS = {
     "Adult": "🐉",
     "Elder": "🐲",
 }
+
+ACTIVITY_VERBS = [
+    "is lingering",
+    "is loitering",
+    "is lurking",
+    "is drifting",
+    "is hovering",
+    "is haunting",
+    "is browsing",
+    "is sitting",
+    "is standing",
+    "is pacing",
+    "is reading",
+    "is pretending to read",
+    "is smoking outside",
+    "is waiting outside",
+    "is wandering through",
+    "is leafing through",
+    "is picking through",
+    "is buying far too much at",
+    "is half-listening at",
+    "is forming an opinion at",
+]
+
+ACTIVITY_PLACES = [
+    "an arthouse matinee",
+    "a gallery opening",
+    "a farmer's market",
+    "an independent bookstore",
+    "a repertory cinema",
+    "a museum gift shop",
+    "a wine bar with bad lighting",
+    "a cafe with tiny tables",
+    "a record shop",
+    "a thrift store",
+    "a flea market",
+    "a lecture on architecture",
+    "a poetry reading",
+    "a park full of extremely self-conscious people",
+    "a brutalist plaza",
+    "a screening of a film no one enjoyed out loud",
+    "a boutique that only sells black clothing",
+    "a dinner party that should have ended an hour ago",
+    "a used magazine stall",
+    "a suspiciously expensive bakery",
+]
+
+ACTIVITY_CLAUSES = [
+    "pretending not to care very much.",
+    "judging everyone's shoes in complete silence.",
+    "taking the whole thing far too seriously.",
+    "trying to look accidentally elegant.",
+    "developing a strong and underinformed opinion.",
+    "acting like this is all beneath them.",
+    "quietly thriving, unfortunately.",
+    "behaving as if they invented taste.",
+    "waiting to be recognized as an icon.",
+    "becoming impossible to talk to.",
+    "turning mild boredom into a worldview.",
+    "trying not to seem impressed.",
+    "calling it spiritually necessary.",
+    "treating a small outing like a vocation.",
+    "refusing to admit they're having fun.",
+    "looking for something obscure and severe.",
+    "narrating the vibe internally.",
+    "pretending this is research.",
+    "making a spectacle of restraint.",
+    "committing to the bit completely.",
+]
+
+CURATED_ACTIVITIES = [
+    "is smoking outside a gallery opening and judging everyone's shoes.",
+    "is buying overpriced cherries at the farmer's market with total conviction.",
+    "is flipping through dog-eared paperbacks at an independent bookstore.",
+    "is thrift shopping for something obscure and a little severe.",
+    "is listening to Japanese jazz and staring out the window dramatically.",
+    "is walking through a museum too quickly and forming strong opinions anyway.",
+    "is sitting at a cafe with a tiny coffee and a large theory of culture.",
+    "is loitering outside a repertory cinema like it's a vocation.",
+    "is rearranging flowers from the market into something aggressively tasteful.",
+    "is drinking a bitter aperitif and calling it character-building.",
+    "is wearing knitwear in weather that does not justify it.",
+    "is pretending to discover a director everyone else already discovered years ago.",
+    "is reading criticism in the park and becoming impossible to talk to.",
+    "is lingering in a record shop and pretending to hate whatever is popular.",
+    "is composing a devastating but basically harmless opinion about the room.",
+    "is buying tinned fish as if it were a moral decision.",
+    "is treating a free screening like a sacred obligation.",
+    "is at brunch saying \"decadent\" without irony.",
+    "is staring at a building and calling it spiritually clarifying.",
+    "is carrying a woven basket full of produce that may never get eaten.",
+    "is trying to seem detached at a poetry reading.",
+    "is at a cafe patio refusing to order anything sweet on principle.",
+    "is walking home from a screening with a needlessly baroque interpretation.",
+    "is shopping for sunglasses they absolutely do not need.",
+    "is reading a paperback face-out to signal impeccable taste.",
+]
+
+STATUS_ACTIVITIES = [
+    f"{{name}} {verb} {place}, {clause}"
+    for verb in ACTIVITY_VERBS
+    for place in ACTIVITY_PLACES
+    for clause in ACTIVITY_CLAUSES
+]
+
+STATUS_ACTIVITIES.extend(f"{{name}} {activity}" for activity in CURATED_ACTIVITIES)
 
 
 class SalamagotchiManager:
@@ -336,6 +443,10 @@ class SalamagotchiManager:
 
         return f"{name} is feeling {self._join_phrases(phrases)} today."
 
+    def _build_activity_phrase(self, pet: Dict[str, Any]) -> str:
+        template = random.choice(STATUS_ACTIVITIES)
+        return template.format(name=pet["name"])
+
     def _render_stage_art(self, pet: Dict[str, Any], stage: Dict[str, Any]) -> str:
         feed_remaining = max(0, REQUIREMENTS["feed"] - pet.get("feed_count", 0))
         scoop_remaining = max(0, REQUIREMENTS["scoop"] - pet.get("scoop_count", 0))
@@ -427,6 +538,8 @@ class SalamagotchiManager:
             f"{safe_name} died of {html.escape(pet.get('death_reason', 'unknown causes'))}.",
             "A new Salamagotchi can be spawned in this chat.",
         ]
+        if pet.get("alive"):
+            lines.append(html.escape(self._build_activity_phrase(pet)))
         lines.extend(html.escape(line) for line in hint_lines)
 
         return "\n".join(lines)
