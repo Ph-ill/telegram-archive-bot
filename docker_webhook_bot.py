@@ -855,7 +855,7 @@ class SeleniumArchiveBot:
                 if not event['alive']:
                     self.send_message(
                         chat_id,
-                        f"💀 <b>{name}</b> has died of {event['death_reason']}. You can spawn a new Salamagotchi with /salamagotchi_spawn.",
+                        f"💀 <b>{name}</b> has died of {event['death_reason']}. You can spawn a new Salamagotchi with /pet spawn &lt;name&gt;.",
                         parse_mode='HTML'
                     )
                 elif event.get('stage_changed'):
@@ -1165,8 +1165,8 @@ class SeleniumArchiveBot:
 
         if subcommand == "spawn":
             if not subcommand_args.strip():
-                group_example = f"/salamagotchi@{self.bot_username} spawn Sal"
-                private_example = "/salamagotchi spawn Sal"
+                group_example = f"/pet@{self.bot_username} spawn Sal"
+                private_example = "/pet spawn Sal"
                 return (
                     "<blockquote expandable>🦎 Please provide a name for the Salamagotchi.\n\n"
                     f"<b>Group chat example:</b> {group_example}\n"
@@ -1207,8 +1207,8 @@ class SeleniumArchiveBot:
                 if not subcommand_args.strip():
                     return (
                         "<blockquote expandable>🦎 Please provide a new name.\n\n"
-                        f"<b>Group chat example:</b> /salamagotchi@{self.bot_username} rename Yichen\n"
-                        "<b>Private chat example:</b> /salamagotchi rename Yichen</blockquote>"
+                        f"<b>Group chat example:</b> /pet@{self.bot_username} rename Yichen\n"
+                        "<b>Private chat example:</b> /pet rename Yichen</blockquote>"
                     )
                 result = self.salamagotchi_manager.rename_pet(chat_id, subcommand_args, user_display)
             elif subcommand == "graveyard_remove_last":

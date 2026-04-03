@@ -669,7 +669,7 @@ class SalamagotchiManager:
     def get_status_text(self, chat_id: int) -> str:
         pet = self.get_pet(chat_id)
         if not pet:
-            return "No Salamagotchi exists in this chat yet. Use <code>/salamagotchi_spawn &lt;name&gt;</code> to create one."
+            return "No Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
         return self._format_status_text(pet)
 
     def perform_action(self, chat_id: int, action: str, user_display: str) -> Dict[str, Any]:
@@ -682,7 +682,7 @@ class SalamagotchiManager:
             if not pet:
                 return {
                     "success": False,
-                    "message": "No Salamagotchi exists in this chat yet. Use /salamagotchi_spawn to create one.",
+                    "message": "No Salamagotchi exists in this chat yet. Use /pet spawn <name> to create one.",
                 }
             if not pet.get("alive", False):
                 return {
