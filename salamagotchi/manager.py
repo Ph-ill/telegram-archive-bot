@@ -530,16 +530,23 @@ class SalamagotchiManager:
             f"<b>Status:</b> {status}",
             f"<b>Age:</b> {pet.get('age_days', 0)} day{'s' if pet.get('age_days', 0) != 1 else ''}",
             f"<b>Stage:</b> {html.escape(stage['name'])}",
+        ]
+
+        if pet.get("alive"):
+            lines.extend([
+                "",
+                html.escape(self._build_activity_phrase(pet)),
+            ])
+
+        lines.extend([
             "",
             f"<pre>{html.escape(self._render_stage_art(pet, stage))}</pre>",
-        ]
+        ])
 
         hint_lines = self._build_hint_lines(pet) if pet.get("alive") else [
             f"{safe_name} died of {html.escape(pet.get('death_reason', 'unknown causes'))}.",
             "A new Salamagotchi can be spawned in this chat.",
         ]
-        if pet.get("alive"):
-            lines.append(html.escape(self._build_activity_phrase(pet)))
         lines.extend(html.escape(line) for line in hint_lines)
 
         return "\n".join(lines)
