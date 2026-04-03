@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 REQUIREMENTS = {
-    "feed": 2,
-    "scoop": 2,
+    "feed": 1,
+    "scoop": 1,
     "play": 1,
     "wash": 1,
 }
@@ -860,8 +860,8 @@ class SalamagotchiManager:
             "<b>Commands</b>\n"
             f"<code>{command_prefix} status</code> - Show its status, age, and today's needs\n"
             f"<code>{command_prefix} spawn &lt;name&gt;</code> - Spawn a new shared Salamagotchi\n"
-            f"<code>{command_prefix} feed</code> - Feed it (2 times per day)\n"
-            f"<code>{command_prefix} scoop</code> - Scoop poop (2 times per day)\n"
+            f"<code>{command_prefix} feed</code> - Feed it (1 time per day)\n"
+            f"<code>{command_prefix} scoop</code> - Scoop poop (1 time per day)\n"
             f"<code>{command_prefix} play</code> - Play with it (1 time per day)\n"
             f"<code>{command_prefix} wash</code> - Wash it (1 time per day)\n"
             f"<code>{command_prefix} help</code> - Show this help text\n\n"
