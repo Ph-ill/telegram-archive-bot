@@ -216,42 +216,63 @@ class SalamagotchiManager:
                 return stage
         return STAGES[-1]
 
-    def _render_progress_lines(self, pet: Dict[str, Any]) -> List[str]:
-        return [
-            f"Feed: {pet.get('feed_count', 0)}/{REQUIREMENTS['feed']}",
-            f"Scoop: {pet.get('scoop_count', 0)}/{REQUIREMENTS['scoop']}",
-            f"Play: {pet.get('play_count', 0)}/{REQUIREMENTS['play']}",
-            f"Wash: {pet.get('wash_count', 0)}/{REQUIREMENTS['wash']}",
-        ]
+    def _join_phrases(self, phrases: List[str]) -> str:
+        if not phrases:
+            return ""
+        if len(phrases) == 1:
+            return phrases[0]
+        if len(phrases) == 2:
+            return f"{phrases[0]} and {phrases[1]}"
+        return f"{', '.join(phrases[:-1])}, and {phrases[-1]}"
 
     def _build_hint_lines(self, pet: Dict[str, Any]) -> List[str]:
         lines: List[str] = []
-        for action, required in REQUIREMENTS.items():
-            current = pet.get(f"{action}_count", 0)
-            remaining = max(0, required - current)
-            if remaining == 0:
-                if action == "play":
-                    lines.append("Play completed for today.")
-                else:
-                    lines.append(f"{ACTION_LABELS[action].title()} complete for today.")
-            else:
-                if action == "feed":
-                    lines.append(f"Needs {remaining} more feeding{'s' if remaining != 1 else ''} today.")
-                elif action == "scoop":
-                    lines.append(f"Needs {remaining} more scoop{'s' if remaining != 1 else ''} today.")
-                else:
-                    article = "a " if remaining == 1 else f"{remaining} "
-                    plural = "" if remaining == 1 else "s"
-                    lines.append(f"Needs {article}{ACTION_LABELS[action]}{plural} today.")
+        name = pet["name"]
+        need_phrases: List[str] = []
 
+        feed_remaining = max(0, REQUIREMENTS["feed"] - pet.get("feed_count", 0))
+        if feed_remaining == 1:
+            need_phrases.append("another feeding")
+        elif feed_remaining > 1:
+            need_phrases.append(f"{feed_remaining} more feedings")
+
+        scoop_remaining = max(0, REQUIREMENTS["scoop"] - pet.get("scoop_count", 0))
+        if scoop_remaining == 1:
+            need_phrases.append("to have their poop scooped once")
+        elif scoop_remaining > 1:
+            need_phrases.append(f"to have their poop scooped {scoop_remaining} more times")
+
+        if pet.get("play_count", 0) < REQUIREMENTS["play"]:
+            need_phrases.append("some playtime")
+
+        if pet.get("wash_count", 0) < REQUIREMENTS["wash"]:
+            need_phrases.append("a bath")
+
+        if not need_phrases:
+            lines.append(f"{name} is all set for today and seems very pleased with the chat.")
+        else:
+            if feed_remaining > 0:
+                opening = f"{name} is still super hungry today and needs "
+            else:
+                opening = f"{name} still needs "
+            lines.append(f"{opening}{self._join_phrases(need_phrases)}.")
+
+        warning_phrases: List[str] = []
         for action, field in NEGLECT_FIELDS.items():
             if pet.get(field, 0) == 1:
-                lines.append(
-                    f"Warning: {ACTION_LABELS[action].title()} was missed yesterday. Miss it again and {pet['name']} dies."
-                )
+                if action == "feed":
+                    warning_phrases.append("feeding")
+                elif action == "scoop":
+                    warning_phrases.append("poop scooping")
+                elif action == "play":
+                    warning_phrases.append("playtime")
+                elif action == "wash":
+                    warning_phrases.append("washing")
 
-        if all(pet.get(f"{action}_count", 0) >= required for action, required in REQUIREMENTS.items()):
-            lines.insert(0, "All care requirements are satisfied for today.")
+        if warning_phrases:
+            lines.append(
+                f"Warning: {self._join_phrases(warning_phrases).capitalize()} was missed yesterday, so missing it again today will kill {name}."
+            )
 
         return lines
 
@@ -267,9 +288,6 @@ class SalamagotchiManager:
             f"<b>Stage:</b> {html.escape(stage['name'])}",
             "",
             f"<pre>{html.escape(stage['art'])}</pre>",
-            "",
-            "<b>Today's Care</b>",
-            *[html.escape(line) for line in self._render_progress_lines(pet)],
             "",
             "<b>Hints</b>",
         ]
