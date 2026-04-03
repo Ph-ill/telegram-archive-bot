@@ -56,7 +56,7 @@ STAGES: List[Dict[str, Any]] = [
     .'  .-.  '.
    /   (o o)   \
   |      ^      |
-  |   \_____/   |
+  |     MOUTH     |
    \           /
     '._     _.'
        '---'
@@ -71,7 +71,7 @@ STAGES: List[Dict[str, Any]] = [
     .'  / .  . \  '.
    /   |  ()()  |   \
   |    |   ^^   |    |
-  |    |  \__/  |    |
+  |    |  MOUTH |    |
    \    \      /    /
     '._  '----'  _.'
        '--.__.--'
@@ -86,7 +86,7 @@ STAGES: List[Dict[str, Any]] = [
     .-'  _    _  '-.
    /   .'o\  /o'.   \
   |   /   .--.   \   |
-  |   |  (____)  |   |
+  |   |  (MOUTH) |   |
   |   \   '--'   /   |
    \   '._    _.'   /
     '._    '--'  _.'
@@ -102,7 +102,7 @@ STAGES: List[Dict[str, Any]] = [
      .-'  .--.    '-.
     /   .' o  '.     \
    |   /  .--.  \     |
-   |   | (____) |     |
+   |   | (MOUTH) |    |
    |   \  '--'  /     |
     \   '.___.'     .'
      '._         _.'
@@ -119,7 +119,7 @@ STAGES: List[Dict[str, Any]] = [
      /   .' o  o '.     \
     |   /    ..    \     |
     |   |  .____.  |     |
-    |   | (______) |     |
+    |   | ( MOUTH ) |    |
     |   \   '--'   /     |
      \   '._    _.'    .'
       '._   '=='   _.-'
@@ -136,7 +136,7 @@ STAGES: List[Dict[str, Any]] = [
       /   .' o  o '.     \
      |   /   .--.   \     |
      |   |  /_  _\  |     |
-     |   |  \_)(_/  |     |
+     |   |  (MOUTH) |     |
      |   |   /__\   |     |
      |   \   '--'   /     |
       \   '._    _.'    .'
@@ -263,19 +263,35 @@ class SalamagotchiManager:
         return f"{name} is feeling {self._join_phrases(phrases)} today."
 
     def _render_stage_art(self, pet: Dict[str, Any], stage: Dict[str, Any]) -> str:
-        lines = stage["art"].splitlines()
-
         feed_remaining = max(0, REQUIREMENTS["feed"] - pet.get("feed_count", 0))
         scoop_remaining = max(0, REQUIREMENTS["scoop"] - pet.get("scoop_count", 0))
         play_remaining = max(0, REQUIREMENTS["play"] - pet.get("play_count", 0))
         wash_remaining = max(0, REQUIREMENTS["wash"] - pet.get("wash_count", 0))
+        unmet_needs = sum(
+            1
+            for remaining in [feed_remaining, scoop_remaining, play_remaining, wash_remaining]
+            if remaining > 0
+        )
 
-        top_left = "  zZz" if not pet.get("alive", True) else ("  !!!" if feed_remaining == 2 else "   ! " if feed_remaining == 1 else "     ")
-        top_right = " xx " if not pet.get("alive", True) else (" ~~~ " if scoop_remaining > 0 or wash_remaining > 0 else " *** " if play_remaining == 0 and feed_remaining == 0 else "     ")
-        middle_left = " stink" if scoop_remaining == 2 else "  whf " if scoop_remaining == 1 else "      "
-        middle_right = " bored" if play_remaining > 0 else " clean" if wash_remaining == 0 and scoop_remaining == 0 else "      "
-        bottom_left = " poop " if scoop_remaining == 2 else "  o   " if scoop_remaining == 1 else "      "
-        bottom_right = " bath?" if wash_remaining > 0 else " happy" if pet.get("alive", True) and feed_remaining == 0 and play_remaining == 0 else "      "
+        if not pet.get("alive", True):
+            mouth = "x___x"
+        elif unmet_needs >= 3:
+            mouth = "/___\\"
+        elif unmet_needs == 2:
+            mouth = "\\_-_/"
+        elif unmet_needs == 1:
+            mouth = "\\_._/"
+        else:
+            mouth = "\\___/"
+
+        lines = stage["art"].replace("MOUTH", mouth).splitlines()
+
+        top_left = " x x " if not pet.get("alive", True) else (" !!! " if feed_remaining == 2 else "  !  " if feed_remaining == 1 else "     ")
+        top_right = " ~~~ " if wash_remaining > 0 else "     "
+        middle_left = " ~ ~ " if scoop_remaining > 0 or wash_remaining > 0 else "     "
+        middle_right = "  o  " if play_remaining > 0 else "     "
+        bottom_left = "(_._)" if scoop_remaining == 2 else " (_)" if scoop_remaining == 1 else "     "
+        bottom_right = "  *  " if pet.get("alive", True) and unmet_needs == 0 else "     "
 
         decorated = []
         for idx, line in enumerate(lines):
