@@ -23,6 +23,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, WebDriverException
+from salamagotchi import SalamagotchiManager
 
 def setup_logging():
     """Setup logging with proper error handling"""
@@ -70,6 +71,10 @@ class SeleniumArchiveBot:
         self.data_dir = '/app/data' if os.path.exists('/app/data') else '/app'
         self.processed_file = os.path.join(self.data_dir, "processed_messages.json")
         self.processed_messages = self.load_processed_messages()
+        self.salamagotchi_manager = SalamagotchiManager(
+            self.data_dir,
+            os.environ.get('SALAMAGOTCHI_TIMEZONE', 'America/Chicago')
+        )
         
         # Flask app for webhook
         self.app = Flask(__name__)
@@ -83,6 +88,7 @@ class SeleniumArchiveBot:
         
         # Start birthday monitoring system
         self.start_birthday_monitor()
+        self.start_salamagotchi_monitor()
         
         # Initialize quiz manager if API key is available
         self.quiz_manager = None
@@ -734,6 +740,13 @@ class SeleniumArchiveBot:
         
         # Fun commands
         help_text += "🎯 Activity &amp; Fun Commands:\n"
+        help_text += f"• /salamagotchi_spawn{bot_mention} &lt;name&gt; - Spawn a shared Salamagotchi\n"
+        help_text += f"• /salamagotchi{bot_mention} - Show Salamagotchi status and today's needs\n"
+        help_text += f"• /feed{bot_mention} - Feed the Salamagotchi (2 times per day)\n"
+        help_text += f"• /scoop{bot_mention} - Scoop poop (2 times per day)\n"
+        help_text += f"• /play{bot_mention} - Play with the Salamagotchi (1 time per day)\n"
+        help_text += f"• /wash{bot_mention} - Wash the Salamagotchi (1 time per day)\n"
+        help_text += f"• /salamagotchi_help{bot_mention} - Salamagotchi rules and commands\n"
         help_text += f"• /layla{bot_mention} - Send a random Layla image\n"
         help_text += f"• /bored{bot_mention} - Get a random activity suggestion\n"
         help_text += f"• /bored_type{bot_mention} &lt;type&gt; - Get activity by type\n"
@@ -805,6 +818,53 @@ class SeleniumArchiveBot:
         except Exception as e:
             logger.error(f"Error sending test birthday message: {e}")
             return f"❌ Error sending test message: {str(e)}"
+
+    def start_salamagotchi_monitor(self):
+        """Start background task for Salamagotchi daily rollover checks."""
+        def salamagotchi_monitor():
+            while True:
+                try:
+                    current_time = datetime.now()
+
+                    if current_time.minute == 0:
+                        self.check_and_update_salamagotchis()
+                        logger.debug(
+                            "Salamagotchi rollover check completed at %s",
+                            current_time.strftime('%H:%M')
+                        )
+
+                    next_hour = current_time.replace(minute=0, second=0, microsecond=0) + relativedelta(hours=1)
+                    seconds_until_next_hour = (next_hour - current_time).total_seconds()
+                    time.sleep(max(1, seconds_until_next_hour - 5))
+                except Exception as e:
+                    logger.error(f"Error in Salamagotchi monitor: {e}")
+                    time.sleep(300)
+
+        monitor_thread = threading.Thread(target=salamagotchi_monitor, daemon=True)
+        monitor_thread.start()
+        logger.info("Salamagotchi monitor started - checking at the start of each hour")
+
+    def check_and_update_salamagotchis(self):
+        """Process Salamagotchi daily rollovers and notify chats on death or stage change."""
+        try:
+            events = self.salamagotchi_manager.process_daily_rollovers()
+            for event in events:
+                chat_id = event['chat_id']
+                name = event['name']
+                if not event['alive']:
+                    self.send_message(
+                        chat_id,
+                        f"💀 <b>{name}</b> has died of {event['death_reason']}. You can spawn a new Salamagotchi with /salamagotchi_spawn.",
+                        parse_mode='HTML'
+                    )
+                elif event.get('stage_changed'):
+                    self.send_message(
+                        chat_id,
+                        f"🌱 <b>{name}</b> survived another day and grew into the <b>{event['stage']}</b> stage!",
+                        parse_mode='HTML'
+                    )
+        except Exception as e:
+            logger.error(f"Error processing Salamagotchi rollovers: {e}")
     
     def create_driver(self):
         """Create a headless Chrome driver"""
@@ -956,6 +1016,9 @@ class SeleniumArchiveBot:
         
         elif command == "/layla":
             return self.handle_layla_command(chat_id)
+
+        elif command in ["/salamagotchi_spawn", "/salamagotchi", "/feed", "/scoop", "/play", "/wash", "/salamagotchi_help"]:
+            return self.handle_salamagotchi_command(command, args, sender_name, sender_username, sender_id, chat_id)
         
         elif command == "/bored":
             return self.handle_bored_command()
@@ -1068,6 +1131,41 @@ class SeleniumArchiveBot:
             return f"<blockquote expandable>✅ Your birthday has been saved!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}</blockquote>"
         else:
             return f"<blockquote expandable>✅ Birthday saved for @{target_username}!\nBirthday: {birthday_data['date']}\nTimezone: {birthday_data['timezone']}\nCurrent age: {age}{update_message}</blockquote>"
+
+    def handle_salamagotchi_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
+        """Handle Salamagotchi commands."""
+        user_display = sender_username or sender_name or f"user_{sender_id}"
+
+        if command == "/salamagotchi_spawn":
+            if not args.strip():
+                return "Please provide a name.\nExample: /salamagotchi_spawn Sal"
+
+            result = self.salamagotchi_manager.spawn(chat_id, args, user_display)
+            if result['success']:
+                return f"{result['message']}\n\n{result['status_text']}"
+            return result['message']
+
+        if command == "/salamagotchi":
+            return self.salamagotchi_manager.get_status_text(chat_id)
+
+        if command == "/salamagotchi_help":
+            return self.salamagotchi_manager.get_help_text()
+
+        action_map = {
+            "/feed": "feed",
+            "/scoop": "scoop",
+            "/play": "play",
+            "/wash": "wash",
+        }
+
+        action = action_map.get(command)
+        if action:
+            result = self.salamagotchi_manager.perform_action(chat_id, action, user_display)
+            if result.get('status_text'):
+                return f"{result['message']}\n\n{result['status_text']}"
+            return result['message']
+
+        return "Unknown Salamagotchi command."
     
     def handle_layla_command(self, chat_id):
         """Handle /layla command - send random image from layla_images folder"""
@@ -2601,6 +2699,13 @@ class SeleniumArchiveBot:
                 {"command": "help", "description": "Show available commands"},
                 {"command": "archive", "description": "Archive a URL"},
                 {"command": "birthday_set", "description": "Set your birthday"},
+                {"command": "salamagotchi_spawn", "description": "Spawn a shared Salamagotchi"},
+                {"command": "salamagotchi", "description": "Show Salamagotchi status"},
+                {"command": "feed", "description": "Feed the Salamagotchi"},
+                {"command": "scoop", "description": "Scoop Salamagotchi poop"},
+                {"command": "play", "description": "Play with the Salamagotchi"},
+                {"command": "wash", "description": "Wash the Salamagotchi"},
+                {"command": "salamagotchi_help", "description": "Show Salamagotchi rules"},
                 {"command": "layla", "description": "Send a random Layla image"},
                 {"command": "bored", "description": "Get a random activity suggestion"},
                 {"command": "bored_type", "description": "Get activity by type (education, social, etc.)"},
@@ -2619,6 +2724,13 @@ class SeleniumArchiveBot:
                 {"command": "help", "description": "Show available commands"},
                 {"command": "archive", "description": "Archive a URL"},
                 {"command": "birthday_set", "description": "Set your birthday"},
+                {"command": "salamagotchi_spawn", "description": "Spawn a shared Salamagotchi"},
+                {"command": "salamagotchi", "description": "Show Salamagotchi status"},
+                {"command": "feed", "description": "Feed the Salamagotchi"},
+                {"command": "scoop", "description": "Scoop Salamagotchi poop"},
+                {"command": "play", "description": "Play with the Salamagotchi"},
+                {"command": "wash", "description": "Wash the Salamagotchi"},
+                {"command": "salamagotchi_help", "description": "Show Salamagotchi rules"},
                 {"command": "layla", "description": "Send a random Layla image"},
                 {"command": "bored", "description": "Get a random activity suggestion"},
                 {"command": "bored_type", "description": "Get activity by type (education, social, etc.)"},
