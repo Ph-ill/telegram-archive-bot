@@ -1138,7 +1138,14 @@ class SeleniumArchiveBot:
 
         if command == "/salamagotchi_spawn":
             if not args.strip():
-                return "Please provide a name.\nExample: /salamagotchi_spawn Sal"
+                group_example = f"/salamagotchi_spawn@{self.bot_username} Sal"
+                private_example = "/salamagotchi_spawn Sal"
+                return (
+                    "<blockquote expandable>🦎 Please provide a name for the Salamagotchi.\n\n"
+                    f"<b>Group chat example:</b> {group_example}\n"
+                    f"<b>Private chat example:</b> {private_example}\n\n"
+                    "You cannot spawn a Salamagotchi without naming it.</blockquote>"
+                )
 
             result = self.salamagotchi_manager.spawn(chat_id, args, user_display)
             if result['success']:
