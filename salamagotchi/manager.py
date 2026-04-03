@@ -517,6 +517,85 @@ class SalamagotchiManager:
             "status_text": self._format_status_text(pet),
         }
 
+    def reset_daily_needs(self, chat_id: int, user_display: str) -> Dict[str, Any]:
+        with self.lock:
+            data = self._read_data()
+            pet = data.get(str(chat_id))
+            if not pet:
+                return {
+                    "success": False,
+                    "message": "No Salamagotchi exists in this chat yet.",
+                }
+
+            for action in REQUIREMENTS:
+                pet[f"{action}_count"] = 0
+            pet["last_interaction_by"] = user_display
+            data[str(chat_id)] = pet
+            self._write_data(data)
+
+        return {
+            "success": True,
+            "message": f"🔄 {html.escape(pet['name'])}'s daily care has been reset.",
+            "status_text": self._format_status_text(pet),
+        }
+
+    def rename_pet(self, chat_id: int, new_name: str, user_display: str) -> Dict[str, Any]:
+        cleaned_name = " ".join(new_name.split()).strip()
+        if not cleaned_name:
+            return {"success": False, "message": "Please provide a new name for the Salamagotchi."}
+        if len(cleaned_name) > 30:
+            return {"success": False, "message": "Salamagotchi names must be 30 characters or fewer."}
+
+        with self.lock:
+            data = self._read_data()
+            pet = data.get(str(chat_id))
+            if not pet:
+                return {
+                    "success": False,
+                    "message": "No Salamagotchi exists in this chat yet.",
+                }
+
+            old_name = pet["name"]
+            pet["name"] = cleaned_name
+            pet["last_interaction_by"] = user_display
+            data[str(chat_id)] = pet
+            self._write_data(data)
+
+        return {
+            "success": True,
+            "message": f"✏️ {html.escape(old_name)} has been renamed to <b>{html.escape(cleaned_name)}</b>.",
+            "status_text": self._format_status_text(pet),
+        }
+
+    def force_kill(self, chat_id: int, user_display: str, reason: str = "admin intervention") -> Dict[str, Any]:
+        with self.lock:
+            data = self._read_data()
+            pet = data.get(str(chat_id))
+            if not pet:
+                return {
+                    "success": False,
+                    "message": "No Salamagotchi exists in this chat yet.",
+                }
+            if not pet.get("alive", False):
+                return {
+                    "success": False,
+                    "message": f"{pet['name']} is already dead.",
+                    "status_text": self._format_status_text(pet),
+                }
+
+            pet["alive"] = False
+            pet["death_reason"] = reason
+            pet["died_at"] = datetime.now(pytz.UTC).isoformat()
+            pet["last_interaction_by"] = user_display
+            data[str(chat_id)] = pet
+            self._write_data(data)
+
+        return {
+            "success": True,
+            "message": f"💀 <b>{html.escape(pet['name'])}</b> has been killed.",
+            "status_text": self._format_status_text(pet),
+        }
+
     def get_help_text(self) -> str:
         return (
             "🦎 <b>Salamagotchi Help</b>\n\n"
@@ -529,6 +608,10 @@ class SalamagotchiManager:
             "<code>/salamagotchi play</code> - Play with it (1 time per day)\n"
             "<code>/salamagotchi wash</code> - Wash it (1 time per day)\n"
             "<code>/salamagotchi help</code> - Show this help text\n\n"
+            "<b>Admin Commands</b>\n"
+            "<code>/salamagotchi reset</code> - Reset today's care counters\n"
+            "<code>/salamagotchi rename &lt;name&gt;</code> - Rename the current pet\n"
+            "<code>/salamagotchi kill</code> - Forcibly kill the current pet\n\n"
             "<b>Rules</b>\n"
             "• One shared Salamagotchi per chat\n"
             "• You cannot spawn a new one while the current one is alive\n"
