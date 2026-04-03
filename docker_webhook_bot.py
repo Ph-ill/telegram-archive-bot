@@ -1195,7 +1195,7 @@ class SeleniumArchiveBot:
                 return f"{result['message']}\n\n{result['status_text']}"
             return result['message']
 
-        if subcommand in {"reset", "rename", "kill"}:
+        if subcommand in {"reset", "rename", "kill", "graveyard_remove_last"}:
             if sender_username.lower() not in special_users:
                 return "This Salamagotchi command is only available to administrators."
 
@@ -1209,11 +1209,15 @@ class SeleniumArchiveBot:
                         "<b>Private chat example:</b> /salamagotchi rename Yichen</blockquote>"
                     )
                 result = self.salamagotchi_manager.rename_pet(chat_id, subcommand_args, user_display)
+            elif subcommand == "graveyard_remove_last":
+                result = self.salamagotchi_manager.remove_latest_graveyard_entry(chat_id)
             else:
                 result = self.salamagotchi_manager.force_kill(chat_id, user_display)
 
             if result.get('status_text'):
                 return f"{result['message']}\n\n{result['status_text']}"
+            if result.get('graveyard_text'):
+                return f"{result['message']}\n\n{result['graveyard_text']}"
             return result['message']
 
         return "Unknown Salamagotchi command."

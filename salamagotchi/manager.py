@@ -697,6 +697,34 @@ class SalamagotchiManager:
 
         return "\n".join(lines)
 
+    def remove_latest_graveyard_entry(self, chat_id: int) -> Dict[str, Any]:
+        with self.lock:
+            data = self._read_data()
+            pet = self._normalize_pet(data.get(str(chat_id)))
+            if not pet:
+                return {
+                    "success": False,
+                    "message": "No Salamagotchi exists in this chat yet.",
+                }
+
+            graveyard = pet.get("graveyard", [])
+            if not graveyard:
+                return {
+                    "success": False,
+                    "message": "⚰️ The graveyard is already empty.",
+                }
+
+            removed_entry = graveyard.pop()
+            pet["graveyard"] = graveyard
+            data[str(chat_id)] = pet
+            self._write_data(data)
+
+        return {
+            "success": True,
+            "message": f"🧹 Removed the most recent graveyard entry for <b>{html.escape(removed_entry['name'])}</b>.",
+            "graveyard_text": self.get_graveyard_text(chat_id),
+        }
+
     def get_help_text(self) -> str:
         return (
             "🦎 <b>Salamagotchi Help</b>\n\n"
@@ -714,6 +742,7 @@ class SalamagotchiManager:
             "<code>/salamagotchi reset</code> - Reset today's care counters\n"
             "<code>/salamagotchi rename &lt;name&gt;</code> - Rename the current pet\n"
             "<code>/salamagotchi kill</code> - Forcibly kill the current pet\n\n"
+            "<code>/salamagotchi graveyard_remove_last</code> - Remove the newest graveyard entry\n\n"
             "<b>Rules</b>\n"
             "• One shared Salamagotchi per chat\n"
             "• You cannot spawn a new one while the current one is alive\n"
