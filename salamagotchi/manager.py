@@ -147,6 +147,15 @@ STAGES: List[Dict[str, Any]] = [
     },
 ]
 
+STAGE_EMOJIS = {
+    "Eggling": "🥚",
+    "Baby": "🐣",
+    "Child": "🦎",
+    "Teen": "🦖",
+    "Adult": "🐉",
+    "Elder": "🐲",
+}
+
 
 class SalamagotchiManager:
     """Persistent shared-chat Salamagotchi manager."""
@@ -403,9 +412,10 @@ class SalamagotchiManager:
         stage = self._get_stage(pet.get("age_days", 0))
         safe_name = html.escape(pet.get("name", "Salamagotchi"))
         status = "Alive" if pet.get("alive") else "Dead"
+        stage_emoji = STAGE_EMOJIS.get(stage["name"], "🦎")
 
         lines = [
-            f"🦎 <b>{safe_name}</b>",
+            f"{stage_emoji} <b>{safe_name}</b>",
             f"<b>Status:</b> {status}",
             f"<b>Age:</b> {pet.get('age_days', 0)} day{'s' if pet.get('age_days', 0) != 1 else ''}",
             f"<b>Stage:</b> {html.escape(stage['name'])}",
