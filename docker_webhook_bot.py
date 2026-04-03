@@ -741,6 +741,7 @@ class SeleniumArchiveBot:
         # Fun commands
         help_text += "🎯 Activity &amp; Fun Commands:\n"
         help_text += f"• /pet{bot_mention} status - Show Salamagotchi status and today's needs\n"
+        help_text += f"• /pet{bot_mention} commands - Show custom commands sent to the pet\n"
         help_text += f"• /pet{bot_mention} spawn &lt;name&gt; - Spawn a shared Salamagotchi\n"
         help_text += f"• /pet{bot_mention} feed - Feed the Salamagotchi (1 time per day)\n"
         help_text += f"• /pet{bot_mention} scoop - Scoop poop (1 time per day)\n"
@@ -1069,6 +1070,15 @@ class SeleniumArchiveBot:
             return self.handle_admin_command(command, args, sender_name, sender_username, sender_id, chat_id)
         
         else:
+            pet_result = self.salamagotchi_manager.add_custom_command_log(
+                chat_id,
+                sender_username or sender_name or f"user_{sender_id}",
+                f"{command.lstrip('/')} {args}".strip(),
+            )
+            if pet_result.get("success"):
+                if pet_result.get("status_text"):
+                    return f"{pet_result['message']}\n\n{pet_result['status_text']}"
+                return pet_result["message"]
             return f"Unknown command: {command}. Use /help to see available commands."
     
     def handle_archive_command(self, args, sender_name):
@@ -1187,6 +1197,9 @@ class SeleniumArchiveBot:
         if subcommand == "status":
             return self.salamagotchi_manager.get_status_text(chat_id)
 
+        if subcommand == "commands":
+            return self.salamagotchi_manager.get_command_log_text(chat_id)
+
         if subcommand == "graveyard":
             return self.salamagotchi_manager.get_graveyard_text(chat_id)
 
@@ -1232,6 +1245,11 @@ class SeleniumArchiveBot:
 
         if subcommand in {"feed", "scoop", "play", "wash"}:
             result = self.salamagotchi_manager.perform_action(chat_id, subcommand, user_display)
+            custom_instruction = subcommand_args.strip()
+            if custom_instruction:
+                logged = self.salamagotchi_manager.add_custom_command_log(chat_id, user_display, custom_instruction)
+                if logged.get("success"):
+                    result["message"] = f"{result['message']}\n{logged['message']}"
             if result.get('status_text'):
                 return f"{result['message']}\n\n{result['status_text']}"
             return result['message']
@@ -1259,6 +1277,13 @@ class SeleniumArchiveBot:
                 return f"{result['message']}\n\n{result['status_text']}"
             if result.get('graveyard_text'):
                 return f"{result['message']}\n\n{result['graveyard_text']}"
+            return result['message']
+
+        if command in ["/salamagotchi", "/pet"] and subcommand:
+            custom_text = f"{subcommand} {subcommand_args}".strip()
+            result = self.salamagotchi_manager.add_custom_command_log(chat_id, user_display, custom_text)
+            if result.get('status_text'):
+                return f"{result['message']}\n\n{result['status_text']}"
             return result['message']
 
         return "Unknown Salamagotchi command."

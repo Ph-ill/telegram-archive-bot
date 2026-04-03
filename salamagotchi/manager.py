@@ -335,6 +335,7 @@ class SalamagotchiManager:
             "graveyard_recorded": False,
             "education": {},
             "active_study": None,
+            "command_log": [],
         }
 
     def _normalize_pet(self, pet: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -349,6 +350,7 @@ class SalamagotchiManager:
         normalized.setdefault("death_reason", None)
         normalized.setdefault("education", {})
         normalized.setdefault("active_study", None)
+        normalized.setdefault("command_log", [])
         return normalized
 
     def _format_date(self, iso_value: Optional[str]) -> str:
@@ -449,6 +451,15 @@ class SalamagotchiManager:
             f"{active_study['subject']} ({active_study['target_level']}) "
             f"{active_study['progress_days']}/5"
         )
+
+    def _format_command_timestamp(self, iso_value: Optional[str]) -> str:
+        if not iso_value:
+            return "Unknown time"
+        try:
+            dt = datetime.fromisoformat(iso_value)
+            return dt.astimezone(self.timezone).strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            return "Unknown time"
 
     def _build_need_phrase(self, pet: Dict[str, Any]) -> Optional[str]:
         name = pet["name"]
@@ -934,6 +945,74 @@ class SalamagotchiManager:
             "<blockquote expandable>No active study streak right now.</blockquote>"
         )
 
+    def add_custom_command_log(
+        self,
+        chat_id: int,
+        user_display: str,
+        command_text: str,
+        created_at: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        cleaned_command = " ".join(command_text.split()).strip()
+        if not cleaned_command:
+            return {"success": False, "message": "There was no custom command to log."}
+
+        created_at = created_at or datetime.now(pytz.UTC)
+
+        with self.lock:
+            data = self._read_data()
+            pet = self._normalize_pet(data.get(str(chat_id)))
+            if not pet:
+                return {
+                    "success": False,
+                    "message": "No Salamagotchi exists in this chat yet.",
+                }
+            if not pet.get("alive", False):
+                return {
+                    "success": False,
+                    "message": f"{pet['name']} is dead, so no new commands can be logged.",
+                }
+
+            pet["command_log"].append(
+                {
+                    "user": user_display,
+                    "command": cleaned_command,
+                    "created_at": created_at.isoformat(),
+                }
+            )
+            pet["command_log"] = pet["command_log"][-250:]
+            pet["last_interaction_by"] = user_display
+            data[str(chat_id)] = pet
+            self._write_data(data)
+
+        return {
+            "success": True,
+            "message": f"{html.escape(user_display)} commanded {html.escape(pet['name'])} to {html.escape(cleaned_command)}.",
+            "status_text": self._format_status_text(pet),
+        }
+
+    def get_command_log_text(self, chat_id: int) -> str:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return "No Salamagotchi exists in this chat yet."
+
+        command_log = pet.get("command_log", [])
+        if not command_log:
+            return f"📜 <b>{html.escape(pet['name'])}'s Command Log</b>\n\n<blockquote expandable>No one has sent {html.escape(pet['name'])} any custom commands yet.</blockquote>"
+
+        entries = []
+        for entry in reversed(command_log):
+            timestamp = self._format_command_timestamp(entry.get("created_at"))
+            user_text = html.escape(entry.get("user", "Unknown user"))
+            command_text = html.escape(entry.get("command", ""))
+            entries.append(
+                f"[{timestamp}] {user_text} commanded {html.escape(pet['name'])} to {command_text}."
+            )
+
+        return (
+            f"📜 <b>{html.escape(pet['name'])}'s Command Log</b>\n\n"
+            f"<blockquote expandable>{chr(10).join(entries)}</blockquote>"
+        )
+
     def reset_daily_needs(self, chat_id: int, user_display: str) -> Dict[str, Any]:
         with self.lock:
             data = self._read_data()
@@ -1089,6 +1168,7 @@ class SalamagotchiManager:
             "<blockquote expandable>"
             "<b>Commands</b>\n"
             f"<code>{command_prefix} status</code> - Show its status, age, and today's needs\n"
+            f"<code>{command_prefix} commands</code> - Show the custom command history\n"
             f"<code>{command_prefix} spawn &lt;name&gt;</code> - Spawn a new shared Salamagotchi\n"
             f"<code>{command_prefix} feed</code> - Feed it (1 time per day)\n"
             f"<code>{command_prefix} scoop</code> - Scoop poop (1 time per day)\n"
