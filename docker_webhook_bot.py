@@ -741,11 +741,13 @@ class SeleniumArchiveBot:
         # Fun commands
         help_text += "🎯 Activity &amp; Fun Commands:\n"
         help_text += f"• /salamagotchi{bot_mention} status - Show Salamagotchi status and today's needs\n"
+        help_text += f"• /pet{bot_mention} status - Alias for Salamagotchi commands\n"
         help_text += f"• /salamagotchi{bot_mention} spawn &lt;name&gt; - Spawn a shared Salamagotchi\n"
         help_text += f"• /salamagotchi{bot_mention} feed - Feed the Salamagotchi (2 times per day)\n"
         help_text += f"• /salamagotchi{bot_mention} scoop - Scoop poop (2 times per day)\n"
         help_text += f"• /salamagotchi{bot_mention} play - Play with the Salamagotchi (1 time per day)\n"
         help_text += f"• /salamagotchi{bot_mention} wash - Wash the Salamagotchi (1 time per day)\n"
+        help_text += f"• /salamagotchi{bot_mention} graveyard - Show previous pets and lifetimes\n"
         help_text += f"• /salamagotchi{bot_mention} help - Salamagotchi rules and commands\n"
         help_text += f"• /layla{bot_mention} - Send a random Layla image\n"
         help_text += f"• /bored{bot_mention} - Get a random activity suggestion\n"
@@ -1017,7 +1019,7 @@ class SeleniumArchiveBot:
         elif command == "/layla":
             return self.handle_layla_command(chat_id)
 
-        elif command in ["/salamagotchi_spawn", "/salamagotchi", "/feed", "/scoop", "/play", "/wash", "/salamagotchi_help"]:
+        elif command in ["/salamagotchi_spawn", "/salamagotchi", "/pet", "/feed", "/scoop", "/play", "/wash", "/salamagotchi_help"]:
             return self.handle_salamagotchi_command(command, args, sender_name, sender_username, sender_id, chat_id)
         
         elif command == "/bored":
@@ -1140,7 +1142,7 @@ class SeleniumArchiveBot:
         subcommand = None
         subcommand_args = args
 
-        if command == "/salamagotchi":
+        if command in ["/salamagotchi", "/pet"]:
             args = args.strip()
             if not args:
                 subcommand = "status"
@@ -2749,6 +2751,7 @@ class SeleniumArchiveBot:
                 {"command": "archive", "description": "Archive a URL"},
                 {"command": "birthday_set", "description": "Set your birthday"},
                 {"command": "salamagotchi", "description": "Manage the shared Salamagotchi"},
+                {"command": "pet", "description": "Alias for Salamagotchi commands"},
                 {"command": "salamagotchi_help", "description": "Show Salamagotchi rules"},
                 {"command": "feed", "description": "Feed the Salamagotchi"},
                 {"command": "scoop", "description": "Scoop Salamagotchi poop"},
@@ -2773,6 +2776,7 @@ class SeleniumArchiveBot:
                 {"command": "archive", "description": "Archive a URL"},
                 {"command": "birthday_set", "description": "Set your birthday"},
                 {"command": "salamagotchi", "description": "Manage the shared Salamagotchi"},
+                {"command": "pet", "description": "Alias for Salamagotchi commands"},
                 {"command": "salamagotchi_help", "description": "Show Salamagotchi rules"},
                 {"command": "feed", "description": "Feed the Salamagotchi"},
                 {"command": "scoop", "description": "Scoop Salamagotchi poop"},

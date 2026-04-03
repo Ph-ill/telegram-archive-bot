@@ -238,10 +238,33 @@ class SalamagotchiManager:
         except Exception:
             return "Unknown"
 
+    def _format_lifetime(self, started_at: Optional[str], ended_at: Optional[str], fallback_days: int = 0) -> str:
+        if started_at and ended_at:
+            try:
+                start_dt = datetime.fromisoformat(started_at)
+                end_dt = datetime.fromisoformat(ended_at)
+                total_seconds = max(0, int((end_dt - start_dt).total_seconds()))
+                total_hours = total_seconds // 3600
+                days = total_hours // 24
+                hours = total_hours % 24
+
+                if days == 0:
+                    return f"{hours} hour{'s' if hours != 1 else ''}"
+                return f"{days} day{'s' if days != 1 else ''}, {hours} hour{'s' if hours != 1 else ''}"
+            except Exception:
+                pass
+
+        return f"{fallback_days} day{'s' if fallback_days != 1 else ''}"
+
     def _create_graveyard_entry(self, pet: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "name": pet.get("name", "Unknown"),
             "age_days": pet.get("age_days", 0),
+            "lived_for": self._format_lifetime(
+                pet.get("spawned_at"),
+                pet.get("died_at"),
+                pet.get("age_days", 0),
+            ),
             "born_on": self._format_date(pet.get("spawned_at")),
             "died_on": self._format_date(pet.get("died_at")),
             "death_reason": pet.get("death_reason", "unknown causes"),
@@ -665,7 +688,7 @@ class SalamagotchiManager:
             lines.append(
                 (
                     f"<blockquote expandable><b>{idx}. {html.escape(entry['name'])}</b>\n"
-                    f"Lived: {entry['age_days']} day{'s' if entry['age_days'] != 1 else ''}\n"
+                    f"Lived: {html.escape(entry.get('lived_for', str(entry['age_days'])))}\n"
                     f"Born: {html.escape(entry['born_on'])}\n"
                     f"Died: {html.escape(entry['died_on'])}\n"
                     f"Cause: {html.escape(entry['death_reason'])}</blockquote>"
