@@ -852,24 +852,25 @@ class SalamagotchiManager:
             "graveyard_text": self.get_graveyard_text(chat_id),
         }
 
-    def get_help_text(self) -> str:
+    def get_help_text(self, bot_username: Optional[str] = None, is_group_chat: bool = False) -> str:
+        command_prefix = f"/pet@{bot_username}" if bot_username and is_group_chat else "/pet"
         return (
             "🦎 <b>Salamagotchi Help</b>\n\n"
             "<blockquote expandable>"
             "<b>Commands</b>\n"
-            "<code>/pet status</code> - Show its status, age, and today's needs\n"
-            "<code>/pet spawn &lt;name&gt;</code> - Spawn a new shared Salamagotchi\n"
-            "<code>/pet feed</code> - Feed it (2 times per day)\n"
-            "<code>/pet scoop</code> - Scoop poop (2 times per day)\n"
-            "<code>/pet play</code> - Play with it (1 time per day)\n"
-            "<code>/pet wash</code> - Wash it (1 time per day)\n"
-            "<code>/pet help</code> - Show this help text\n\n"
-            "<code>/pet graveyard</code> - Show previous pets buried in this chat\n\n"
+            f"<code>{command_prefix} status</code> - Show its status, age, and today's needs\n"
+            f"<code>{command_prefix} spawn &lt;name&gt;</code> - Spawn a new shared Salamagotchi\n"
+            f"<code>{command_prefix} feed</code> - Feed it (2 times per day)\n"
+            f"<code>{command_prefix} scoop</code> - Scoop poop (2 times per day)\n"
+            f"<code>{command_prefix} play</code> - Play with it (1 time per day)\n"
+            f"<code>{command_prefix} wash</code> - Wash it (1 time per day)\n"
+            f"<code>{command_prefix} help</code> - Show this help text\n\n"
+            f"<code>{command_prefix} graveyard</code> - Show previous pets buried in this chat\n\n"
             "<b>Admin Commands</b>\n"
-            "<code>/pet reset</code> - Reset today's care counters\n"
-            "<code>/pet rename &lt;name&gt;</code> - Rename the current pet\n"
-            "<code>/pet kill</code> - Forcibly kill the current pet\n\n"
-            "<code>/pet graveyard_remove_last</code> - Remove the newest graveyard entry\n\n"
+            f"<code>{command_prefix} reset</code> - Reset today's care counters\n"
+            f"<code>{command_prefix} rename &lt;name&gt;</code> - Rename the current pet\n"
+            f"<code>{command_prefix} kill</code> - Forcibly kill the current pet\n\n"
+            f"<code>{command_prefix} graveyard_remove_last</code> - Remove the newest graveyard entry\n\n"
             "<b>Rules</b>\n"
             "• One shared Salamagotchi per chat\n"
             "• You cannot spawn a new one while the current one is alive\n"

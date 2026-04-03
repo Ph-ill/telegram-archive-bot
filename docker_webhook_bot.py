@@ -1186,7 +1186,10 @@ class SeleniumArchiveBot:
             return self.salamagotchi_manager.get_graveyard_text(chat_id)
 
         if subcommand == "help":
-            return self.salamagotchi_manager.get_help_text()
+            return self.salamagotchi_manager.get_help_text(
+                bot_username=self.bot_username,
+                is_group_chat=bool(chat_id and chat_id < 0)
+            )
 
         if subcommand in {"feed", "scoop", "play", "wash"}:
             result = self.salamagotchi_manager.perform_action(chat_id, subcommand, user_display)
