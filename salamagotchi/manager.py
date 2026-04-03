@@ -225,37 +225,37 @@ class SalamagotchiManager:
             return f"{phrases[0]} and {phrases[1]}"
         return f"{', '.join(phrases[:-1])}, and {phrases[-1]}"
 
+    def _build_need_phrase(self, pet: Dict[str, Any]) -> Optional[str]:
+        name = pet["name"]
+        phrases: List[str] = []
+
+        feed_remaining = max(0, REQUIREMENTS["feed"] - pet.get("feed_count", 0))
+        if feed_remaining == 2:
+            phrases.append("ravenous")
+        elif feed_remaining == 1:
+            phrases.append("hungry")
+
+        scoop_remaining = max(0, REQUIREMENTS["scoop"] - pet.get("scoop_count", 0))
+        if scoop_remaining == 2:
+            phrases.append("absolutely filthy")
+        elif scoop_remaining == 1:
+            phrases.append("messy")
+
+        if pet.get("play_count", 0) < REQUIREMENTS["play"]:
+            phrases.append("restless")
+
+        if pet.get("wash_count", 0) < REQUIREMENTS["wash"]:
+            phrases.append("grimy")
+
+        if not phrases:
+            return f"{name} is all set for today and seems very pleased with the chat."
+
+        return f"{name} is feeling {self._join_phrases(phrases)} today."
+
     def _build_hint_lines(self, pet: Dict[str, Any]) -> List[str]:
         lines: List[str] = []
         name = pet["name"]
-        need_phrases: List[str] = []
-
-        feed_remaining = max(0, REQUIREMENTS["feed"] - pet.get("feed_count", 0))
-        if feed_remaining == 1:
-            need_phrases.append("another feeding")
-        elif feed_remaining > 1:
-            need_phrases.append(f"{feed_remaining} more feedings")
-
-        scoop_remaining = max(0, REQUIREMENTS["scoop"] - pet.get("scoop_count", 0))
-        if scoop_remaining == 1:
-            need_phrases.append("to have their poop scooped once")
-        elif scoop_remaining > 1:
-            need_phrases.append(f"to have their poop scooped {scoop_remaining} more times")
-
-        if pet.get("play_count", 0) < REQUIREMENTS["play"]:
-            need_phrases.append("some playtime")
-
-        if pet.get("wash_count", 0) < REQUIREMENTS["wash"]:
-            need_phrases.append("a bath")
-
-        if not need_phrases:
-            lines.append(f"{name} is all set for today and seems very pleased with the chat.")
-        else:
-            if feed_remaining > 0:
-                opening = f"{name} is still super hungry today and needs "
-            else:
-                opening = f"{name} still needs "
-            lines.append(f"{opening}{self._join_phrases(need_phrases)}.")
+        lines.append(self._build_need_phrase(pet))
 
         warning_phrases: List[str] = []
         for action, field in NEGLECT_FIELDS.items():
@@ -288,8 +288,6 @@ class SalamagotchiManager:
             f"<b>Stage:</b> {html.escape(stage['name'])}",
             "",
             f"<pre>{html.escape(stage['art'])}</pre>",
-            "",
-            "<b>Hints</b>",
         ]
 
         hint_lines = self._build_hint_lines(pet) if pet.get("alive") else [
