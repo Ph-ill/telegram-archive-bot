@@ -47,6 +47,8 @@ ACTION_LABELS = {
     "wash": "wash",
 }
 
+SCHOOL_LEVELS = ["Diploma", "Degree", "Master's", "PhD"]
+
 STAGES: List[Dict[str, Any]] = [
     {
         "name": "Eggling",
@@ -331,6 +333,8 @@ class SalamagotchiManager:
             "last_interaction_by": user_display,
             "graveyard": [],
             "graveyard_recorded": False,
+            "education": {},
+            "active_study": None,
         }
 
     def _normalize_pet(self, pet: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -343,6 +347,8 @@ class SalamagotchiManager:
         normalized.setdefault("spawned_at", None)
         normalized.setdefault("died_at", None)
         normalized.setdefault("death_reason", None)
+        normalized.setdefault("education", {})
+        normalized.setdefault("active_study", None)
         return normalized
 
     def _format_date(self, iso_value: Optional[str]) -> str:
@@ -384,6 +390,8 @@ class SalamagotchiManager:
             "born_on": self._format_date(pet.get("spawned_at")),
             "died_on": self._format_date(pet.get("died_at")),
             "death_reason": pet.get("death_reason", "unknown causes"),
+            "education": deepcopy(pet.get("education", {})),
+            "active_study": deepcopy(pet.get("active_study")),
         }
 
     def _record_graveyard_entry(self, pet: Dict[str, Any]) -> Dict[str, Any]:
@@ -415,6 +423,32 @@ class SalamagotchiManager:
         if len(phrases) == 2:
             return f"{phrases[0]} and {phrases[1]}"
         return f"{', '.join(phrases[:-1])}, and {phrases[-1]}"
+
+    def _clean_subject_name(self, subject: str) -> str:
+        return " ".join(subject.split()).strip()
+
+    def _get_next_level(self, current_level: str) -> Optional[str]:
+        try:
+            idx = SCHOOL_LEVELS.index(current_level)
+        except ValueError:
+            return None
+        if idx + 1 >= len(SCHOOL_LEVELS):
+            return None
+        return SCHOOL_LEVELS[idx + 1]
+
+    def _format_education_summary(self, education: Dict[str, str]) -> str:
+        if not education:
+            return "None yet"
+        parts = [f"{subject} ({level})" for subject, level in sorted(education.items())]
+        return ", ".join(parts)
+
+    def _format_active_study(self, active_study: Optional[Dict[str, Any]]) -> Optional[str]:
+        if not active_study:
+            return None
+        return (
+            f"{active_study['subject']} ({active_study['target_level']}) "
+            f"{active_study['progress_days']}/5"
+        )
 
     def _build_need_phrase(self, pet: Dict[str, Any]) -> Optional[str]:
         name = pet["name"]
@@ -532,6 +566,13 @@ class SalamagotchiManager:
             f"<b>Stage:</b> {html.escape(stage['name'])}",
         ]
 
+        active_study_text = self._format_active_study(pet.get("active_study"))
+        if active_study_text:
+            lines.append(f"<b>Studying:</b> {html.escape(active_study_text)}")
+
+        if pet.get("education"):
+            lines.append(f"<b>Learned:</b> {html.escape(self._format_education_summary(pet['education']))}")
+
         if pet.get("alive"):
             lines.extend([
                 "",
@@ -551,6 +592,7 @@ class SalamagotchiManager:
     def _apply_rollover(self, pet: Dict[str, Any], current_date: str) -> Tuple[Dict[str, Any], bool]:
         pet = deepcopy(pet)
         previous_stage = self._get_stage(pet.get("age_days", 0))["name"]
+        previous_date = (datetime.strptime(current_date, "%Y-%m-%d").date() - timedelta(days=1)).isoformat()
 
         for action, required in REQUIREMENTS.items():
             count = pet.get(f"{action}_count", 0)
@@ -575,6 +617,10 @@ class SalamagotchiManager:
                 pet[f"{action}_count"] = 0
             pet = self._record_graveyard_entry(pet)
             return pet, False
+
+        active_study = pet.get("active_study")
+        if active_study and active_study.get("last_study_date") != previous_date:
+            pet["active_study"] = None
 
         pet["age_days"] = pet.get("age_days", 0) + 1
         pet["last_rollover_date"] = current_date
@@ -711,6 +757,183 @@ class SalamagotchiManager:
             "status_text": self._format_status_text(pet),
         }
 
+    def start_school_subject(self, chat_id: int, subject: str, user_display: str) -> Dict[str, Any]:
+        cleaned_subject = self._clean_subject_name(subject)
+        if not cleaned_subject:
+            return {"success": False, "message": "Please provide a subject to study."}
+        if len(cleaned_subject) > 40:
+            return {"success": False, "message": "Subject names must be 40 characters or fewer."}
+
+        today = self._local_date_str()
+
+        with self.lock:
+            data = self._read_data()
+            pet = self._normalize_pet(data.get(str(chat_id)))
+            if not pet:
+                return {"success": False, "message": "No Salamagotchi exists in this chat yet."}
+            if not pet.get("alive", False):
+                return {"success": False, "message": f"{pet['name']} is dead and cannot go to school."}
+            if pet.get("active_study"):
+                current = pet["active_study"]
+                return {
+                    "success": False,
+                    "message": f"{pet['name']} is already studying {current['subject']} toward a {current['target_level']}.",
+                }
+            if cleaned_subject in pet.get("education", {}):
+                return {
+                    "success": False,
+                    "message": f"{pet['name']} already studied {cleaned_subject}. Use /pet school upgrade {cleaned_subject} to keep going.",
+                }
+
+            pet["active_study"] = {
+                "subject": cleaned_subject,
+                "target_level": "Diploma",
+                "progress_days": 1,
+                "last_study_date": today,
+            }
+            pet["last_interaction_by"] = user_display
+            data[str(chat_id)] = pet
+            self._write_data(data)
+
+        return {
+            "success": True,
+            "message": f"🎓 {html.escape(pet['name'])} started studying <b>{html.escape(cleaned_subject)}</b> toward a <b>Diploma</b>.",
+            "status_text": self._format_status_text(pet),
+        }
+
+    def continue_school(self, chat_id: int, user_display: str) -> Dict[str, Any]:
+        today = self._local_date_str()
+
+        with self.lock:
+            data = self._read_data()
+            pet = self._normalize_pet(data.get(str(chat_id)))
+            if not pet:
+                return {"success": False, "message": "No Salamagotchi exists in this chat yet."}
+            if not pet.get("alive", False):
+                return {"success": False, "message": f"{pet['name']} is dead and cannot go to school."}
+
+            active_study = pet.get("active_study")
+            if not active_study:
+                return {"success": False, "message": f"{pet['name']} is not currently studying anything."}
+            if active_study.get("last_study_date") == today:
+                return {"success": False, "message": f"{pet['name']} already went to school today."}
+
+            active_study["progress_days"] += 1
+            active_study["last_study_date"] = today
+            pet["last_interaction_by"] = user_display
+
+            completed = False
+            completed_subject = active_study["subject"]
+            completed_level = active_study["target_level"]
+            if active_study["progress_days"] >= 5:
+                pet["education"][completed_subject] = completed_level
+                pet["active_study"] = None
+                completed = True
+
+            data[str(chat_id)] = pet
+            self._write_data(data)
+
+        if completed:
+            return {
+                "success": True,
+                "message": f"🎓 {html.escape(pet['name'])} completed a <b>{html.escape(completed_level)}</b> in <b>{html.escape(completed_subject)}</b>.",
+                "status_text": self._format_status_text(pet),
+            }
+
+        return {
+            "success": True,
+            "message": f"📚 {html.escape(pet['name'])} continued studying <b>{html.escape(active_study['subject'])}</b> ({active_study['progress_days']}/5).",
+            "status_text": self._format_status_text(pet),
+        }
+
+    def upgrade_school_subject(self, chat_id: int, subject: str, user_display: str) -> Dict[str, Any]:
+        cleaned_subject = self._clean_subject_name(subject)
+        if not cleaned_subject:
+            return {"success": False, "message": "Please provide a subject to upgrade."}
+        today = self._local_date_str()
+
+        with self.lock:
+            data = self._read_data()
+            pet = self._normalize_pet(data.get(str(chat_id)))
+            if not pet:
+                return {"success": False, "message": "No Salamagotchi exists in this chat yet."}
+            if not pet.get("alive", False):
+                return {"success": False, "message": f"{pet['name']} is dead and cannot go to school."}
+            if pet.get("active_study"):
+                current = pet["active_study"]
+                return {
+                    "success": False,
+                    "message": f"{pet['name']} is already studying {current['subject']} toward a {current['target_level']}.",
+                }
+
+            education = pet.get("education", {})
+            current_level = education.get(cleaned_subject)
+            if not current_level:
+                return {
+                    "success": False,
+                    "message": f"{pet['name']} has not learned {cleaned_subject} yet. Start it with /pet school start {cleaned_subject}.",
+                }
+
+            next_level = self._get_next_level(current_level)
+            if not next_level:
+                return {
+                    "success": False,
+                    "message": f"{pet['name']} already has the highest qualification in {cleaned_subject}.",
+                }
+
+            pet["active_study"] = {
+                "subject": cleaned_subject,
+                "target_level": next_level,
+                "progress_days": 1,
+                "last_study_date": today,
+            }
+            pet["last_interaction_by"] = user_display
+            data[str(chat_id)] = pet
+            self._write_data(data)
+
+        return {
+            "success": True,
+            "message": f"🎓 {html.escape(pet['name'])} started working toward a <b>{html.escape(next_level)}</b> in <b>{html.escape(cleaned_subject)}</b>.",
+            "status_text": self._format_status_text(pet),
+        }
+
+    def get_school_subjects_text(self, chat_id: int) -> str:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return "No Salamagotchi exists in this chat yet."
+
+        education = pet.get("education", {})
+        active_study = pet.get("active_study")
+        lines = ["🎓 <b>School Subjects</b>"]
+        if education:
+            lines.append(f"<blockquote expandable><b>Learned:</b>\n{html.escape(self._format_education_summary(education))}")
+        else:
+            lines.append("<blockquote expandable><b>Learned:</b>\nNone yet")
+
+        if active_study:
+            lines.append(
+                f"\n\n<b>Currently Studying:</b>\n{html.escape(self._format_active_study(active_study))}"
+            )
+
+        lines.append("</blockquote>")
+        return "".join(lines)
+
+    def get_school_status_text(self, chat_id: int) -> str:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return "No Salamagotchi exists in this chat yet."
+        active_study = pet.get("active_study")
+        if active_study:
+            return (
+                "🎓 <b>School Status</b>\n\n"
+                f"<blockquote expandable><b>Current Track:</b>\n{html.escape(self._format_active_study(active_study))}\n\n"
+                "Miss a day and this streak is lost.</blockquote>"
+            )
+        return (
+            "🎓 <b>School Status</b>\n\n"
+            "<blockquote expandable>No active study streak right now.</blockquote>"
+        )
+
     def reset_daily_needs(self, chat_id: int, user_display: str) -> Dict[str, Any]:
         with self.lock:
             data = self._read_data()
@@ -812,13 +1035,17 @@ class SalamagotchiManager:
         ]
 
         for idx, entry in enumerate(reversed(pet["graveyard"][-10:]), 1):
+            learned_text = self._format_education_summary(entry.get("education", {}))
+            active_text = self._format_active_study(entry.get("active_study"))
             lines.append(
                 (
                     f"<blockquote expandable><b>{idx}. {html.escape(entry['name'])}</b>\n"
                     f"Lived: {html.escape(entry.get('lived_for', str(entry['age_days'])))}\n"
                     f"Born: {html.escape(entry['born_on'])}\n"
                     f"Died: {html.escape(entry['died_on'])}\n"
-                    f"Cause: {html.escape(entry['death_reason'])}</blockquote>"
+                    f"Cause: {html.escape(entry['death_reason'])}\n"
+                    f"Learned: {html.escape(learned_text)}"
+                    f"{f'\\nWas studying: {html.escape(active_text)}' if active_text else ''}</blockquote>"
                 )
             )
 
@@ -866,6 +1093,11 @@ class SalamagotchiManager:
             f"<code>{command_prefix} wash</code> - Wash it (1 time per day)\n"
             f"<code>{command_prefix} help</code> - Show this help text\n\n"
             f"<code>{command_prefix} graveyard</code> - Show previous pets buried in this chat\n\n"
+            f"<code>{command_prefix} school start &lt;subject&gt;</code> - Start a new subject toward a diploma\n"
+            f"<code>{command_prefix} school continue</code> - Continue today's study streak\n"
+            f"<code>{command_prefix} school upgrade &lt;subject&gt;</code> - Upgrade an earned subject to the next level\n"
+            f"<code>{command_prefix} school subjects</code> - Show learned subjects\n"
+            f"<code>{command_prefix} school status</code> - Show the current study streak\n\n"
             "<b>Admin Commands</b>\n"
             f"<code>{command_prefix} reset</code> - Reset today's care counters\n"
             f"<code>{command_prefix} rename &lt;name&gt;</code> - Rename the current pet\n"

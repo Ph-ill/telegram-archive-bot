@@ -747,6 +747,11 @@ class SeleniumArchiveBot:
         help_text += f"• /pet{bot_mention} play - Play with the Salamagotchi (1 time per day)\n"
         help_text += f"• /pet{bot_mention} wash - Wash the Salamagotchi (1 time per day)\n"
         help_text += f"• /pet{bot_mention} graveyard - Show previous pets and lifetimes\n"
+        help_text += f"• /pet{bot_mention} school start &lt;subject&gt; - Start a new subject toward a diploma\n"
+        help_text += f"• /pet{bot_mention} school continue - Continue the current study streak\n"
+        help_text += f"• /pet{bot_mention} school upgrade &lt;subject&gt; - Upgrade an earned subject\n"
+        help_text += f"• /pet{bot_mention} school subjects - Show learned subjects\n"
+        help_text += f"• /pet{bot_mention} school status - Show the current study streak\n"
         help_text += f"• /pet{bot_mention} help - Salamagotchi rules and commands\n"
         help_text += f"• /layla{bot_mention} - Send a random Layla image\n"
         help_text += f"• /bored{bot_mention} - Get a random activity suggestion\n"
@@ -1184,6 +1189,40 @@ class SeleniumArchiveBot:
 
         if subcommand == "graveyard":
             return self.salamagotchi_manager.get_graveyard_text(chat_id)
+
+        if subcommand == "school":
+            school_args = subcommand_args.strip()
+            if not school_args:
+                return (
+                    "<blockquote expandable>🎓 School commands:\n\n"
+                    f"<b>Group chat examples:</b>\n/pet@{self.bot_username} school start Philosophy\n"
+                    f"/pet@{self.bot_username} school continue\n"
+                    f"/pet@{self.bot_username} school upgrade Philosophy\n"
+                    f"/pet@{self.bot_username} school subjects\n"
+                    f"/pet@{self.bot_username} school status\n\n"
+                    "<b>Private chat examples:</b>\n/pet school start Philosophy\n/pet school continue</blockquote>"
+                )
+
+            school_parts = school_args.split(' ', 1)
+            school_command = school_parts[0].lower()
+            school_subject = school_parts[1] if len(school_parts) > 1 else ""
+
+            if school_command == "start":
+                result = self.salamagotchi_manager.start_school_subject(chat_id, school_subject, user_display)
+            elif school_command == "continue":
+                result = self.salamagotchi_manager.continue_school(chat_id, user_display)
+            elif school_command == "upgrade":
+                result = self.salamagotchi_manager.upgrade_school_subject(chat_id, school_subject, user_display)
+            elif school_command == "subjects":
+                return self.salamagotchi_manager.get_school_subjects_text(chat_id)
+            elif school_command == "status":
+                return self.salamagotchi_manager.get_school_status_text(chat_id)
+            else:
+                return "Unknown school command. Use /pet school start, continue, upgrade, subjects, or status."
+
+            if result.get('status_text'):
+                return f"{result['message']}\n\n{result['status_text']}"
+            return result['message']
 
         if subcommand == "help":
             return self.salamagotchi_manager.get_help_text(
