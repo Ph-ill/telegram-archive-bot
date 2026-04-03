@@ -1037,6 +1037,9 @@ class SalamagotchiManager:
         for idx, entry in enumerate(reversed(pet["graveyard"][-10:]), 1):
             learned_text = self._format_education_summary(entry.get("education", {}))
             active_text = self._format_active_study(entry.get("active_study"))
+            active_suffix = ""
+            if active_text:
+                active_suffix = f"\nWas studying: {html.escape(active_text)}"
             lines.append(
                 (
                     f"<blockquote expandable><b>{idx}. {html.escape(entry['name'])}</b>\n"
@@ -1045,7 +1048,7 @@ class SalamagotchiManager:
                     f"Died: {html.escape(entry['died_on'])}\n"
                     f"Cause: {html.escape(entry['death_reason'])}\n"
                     f"Learned: {html.escape(learned_text)}"
-                    f"{f'\\nWas studying: {html.escape(active_text)}' if active_text else ''}</blockquote>"
+                    f"{active_suffix}</blockquote>"
                 )
             )
 
