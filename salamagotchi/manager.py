@@ -213,7 +213,48 @@ class SalamagotchiManager:
             "died_at": None,
             "spawned_by": user_display,
             "last_interaction_by": user_display,
+            "graveyard": [],
+            "graveyard_recorded": False,
         }
+
+    def _normalize_pet(self, pet: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if pet is None:
+            return None
+
+        normalized = deepcopy(pet)
+        normalized.setdefault("graveyard", [])
+        normalized.setdefault("graveyard_recorded", False)
+        normalized.setdefault("spawned_at", None)
+        normalized.setdefault("died_at", None)
+        normalized.setdefault("death_reason", None)
+        return normalized
+
+    def _format_date(self, iso_value: Optional[str]) -> str:
+        if not iso_value:
+            return "Unknown"
+        try:
+            dt = datetime.fromisoformat(iso_value)
+            return dt.astimezone(self.timezone).strftime("%Y-%m-%d")
+        except Exception:
+            return "Unknown"
+
+    def _create_graveyard_entry(self, pet: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "name": pet.get("name", "Unknown"),
+            "age_days": pet.get("age_days", 0),
+            "born_on": self._format_date(pet.get("spawned_at")),
+            "died_on": self._format_date(pet.get("died_at")),
+            "death_reason": pet.get("death_reason", "unknown causes"),
+        }
+
+    def _record_graveyard_entry(self, pet: Dict[str, Any]) -> Dict[str, Any]:
+        pet = self._normalize_pet(pet)
+        if pet.get("graveyard_recorded"):
+            return pet
+
+        pet["graveyard"].append(self._create_graveyard_entry(pet))
+        pet["graveyard_recorded"] = True
+        return pet
 
     def _local_date_str(self, now: Optional[datetime] = None) -> str:
         now = now or datetime.now(pytz.UTC)
@@ -382,6 +423,7 @@ class SalamagotchiManager:
             pet["last_rollover_date"] = current_date
             for action in REQUIREMENTS:
                 pet[f"{action}_count"] = 0
+            pet = self._record_graveyard_entry(pet)
             return pet, False
 
         pet["age_days"] = pet.get("age_days", 0) + 1
@@ -449,7 +491,7 @@ class SalamagotchiManager:
 
         with self.lock:
             data = self._read_data()
-            existing = data.get(str(chat_id))
+            existing = self._normalize_pet(data.get(str(chat_id)))
             if existing and existing.get("alive", False):
                 return {
                     "success": False,
@@ -457,6 +499,8 @@ class SalamagotchiManager:
                 }
 
             pet = self._default_state(cleaned_name, user_display, now)
+            if existing:
+                pet["graveyard"] = existing.get("graveyard", [])
             data[str(chat_id)] = pet
             self._write_data(data)
 
@@ -469,7 +513,7 @@ class SalamagotchiManager:
     def get_pet(self, chat_id: int) -> Optional[Dict[str, Any]]:
         with self.lock:
             data = self._read_data()
-            pet = data.get(str(chat_id))
+            pet = self._normalize_pet(data.get(str(chat_id)))
             return deepcopy(pet) if pet else None
 
     def get_status_text(self, chat_id: int) -> str:
@@ -484,7 +528,7 @@ class SalamagotchiManager:
 
         with self.lock:
             data = self._read_data()
-            pet = data.get(str(chat_id))
+            pet = self._normalize_pet(data.get(str(chat_id)))
             if not pet:
                 return {
                     "success": False,
@@ -520,7 +564,7 @@ class SalamagotchiManager:
     def reset_daily_needs(self, chat_id: int, user_display: str) -> Dict[str, Any]:
         with self.lock:
             data = self._read_data()
-            pet = data.get(str(chat_id))
+            pet = self._normalize_pet(data.get(str(chat_id)))
             if not pet:
                 return {
                     "success": False,
@@ -548,7 +592,7 @@ class SalamagotchiManager:
 
         with self.lock:
             data = self._read_data()
-            pet = data.get(str(chat_id))
+            pet = self._normalize_pet(data.get(str(chat_id)))
             if not pet:
                 return {
                     "success": False,
@@ -570,7 +614,7 @@ class SalamagotchiManager:
     def force_kill(self, chat_id: int, user_display: str, reason: str = "admin intervention") -> Dict[str, Any]:
         with self.lock:
             data = self._read_data()
-            pet = data.get(str(chat_id))
+            pet = self._normalize_pet(data.get(str(chat_id)))
             if not pet:
                 return {
                     "success": False,
@@ -587,6 +631,7 @@ class SalamagotchiManager:
             pet["death_reason"] = reason
             pet["died_at"] = datetime.now(pytz.UTC).isoformat()
             pet["last_interaction_by"] = user_display
+            pet = self._record_graveyard_entry(pet)
             data[str(chat_id)] = pet
             self._write_data(data)
 
@@ -595,6 +640,39 @@ class SalamagotchiManager:
             "message": f"💀 <b>{html.escape(pet['name'])}</b> has been killed.",
             "status_text": self._format_status_text(pet),
         }
+
+    def get_graveyard_text(self, chat_id: int) -> str:
+        pet = self.get_pet(chat_id)
+        if not pet or not pet.get("graveyard"):
+            return "⚰️ No Salamagotchis have been buried in this chat yet."
+
+        tombstone = (
+            "      _.---._\n"
+            "    .'       '.\n"
+            "   /  R. I. P.  \\\n"
+            "  | Salamagotchi |\n"
+            "  |   Graveyard  |\n"
+            "  |______________|\n"
+            "     /_/   \\_\\"
+        )
+
+        lines = [
+            "⚰️ <b>Salamagotchi Graveyard</b>",
+            f"<pre>{html.escape(tombstone)}</pre>",
+        ]
+
+        for idx, entry in enumerate(reversed(pet["graveyard"][-10:]), 1):
+            lines.append(
+                (
+                    f"<blockquote expandable><b>{idx}. {html.escape(entry['name'])}</b>\n"
+                    f"Lived: {entry['age_days']} day{'s' if entry['age_days'] != 1 else ''}\n"
+                    f"Born: {html.escape(entry['born_on'])}\n"
+                    f"Died: {html.escape(entry['died_on'])}\n"
+                    f"Cause: {html.escape(entry['death_reason'])}</blockquote>"
+                )
+            )
+
+        return "\n".join(lines)
 
     def get_help_text(self) -> str:
         return (
@@ -608,6 +686,7 @@ class SalamagotchiManager:
             "<code>/salamagotchi play</code> - Play with it (1 time per day)\n"
             "<code>/salamagotchi wash</code> - Wash it (1 time per day)\n"
             "<code>/salamagotchi help</code> - Show this help text\n\n"
+            "<code>/salamagotchi graveyard</code> - Show previous pets buried in this chat\n\n"
             "<b>Admin Commands</b>\n"
             "<code>/salamagotchi reset</code> - Reset today's care counters\n"
             "<code>/salamagotchi rename &lt;name&gt;</code> - Rename the current pet\n"

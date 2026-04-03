@@ -1181,6 +1181,9 @@ class SeleniumArchiveBot:
         if subcommand == "status":
             return self.salamagotchi_manager.get_status_text(chat_id)
 
+        if subcommand == "graveyard":
+            return self.salamagotchi_manager.get_graveyard_text(chat_id)
+
         if subcommand == "help":
             return self.salamagotchi_manager.get_help_text()
 
