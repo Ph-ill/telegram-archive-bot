@@ -740,13 +740,13 @@ class SeleniumArchiveBot:
         
         # Fun commands
         help_text += "🎯 Activity &amp; Fun Commands:\n"
-        help_text += f"• /salamagotchi_spawn{bot_mention} &lt;name&gt; - Spawn a shared Salamagotchi\n"
-        help_text += f"• /salamagotchi{bot_mention} - Show Salamagotchi status and today's needs\n"
-        help_text += f"• /feed{bot_mention} - Feed the Salamagotchi (2 times per day)\n"
-        help_text += f"• /scoop{bot_mention} - Scoop poop (2 times per day)\n"
-        help_text += f"• /play{bot_mention} - Play with the Salamagotchi (1 time per day)\n"
-        help_text += f"• /wash{bot_mention} - Wash the Salamagotchi (1 time per day)\n"
-        help_text += f"• /salamagotchi_help{bot_mention} - Salamagotchi rules and commands\n"
+        help_text += f"• /salamagotchi{bot_mention} status - Show Salamagotchi status and today's needs\n"
+        help_text += f"• /salamagotchi{bot_mention} spawn &lt;name&gt; - Spawn a shared Salamagotchi\n"
+        help_text += f"• /salamagotchi{bot_mention} feed - Feed the Salamagotchi (2 times per day)\n"
+        help_text += f"• /salamagotchi{bot_mention} scoop - Scoop poop (2 times per day)\n"
+        help_text += f"• /salamagotchi{bot_mention} play - Play with the Salamagotchi (1 time per day)\n"
+        help_text += f"• /salamagotchi{bot_mention} wash - Wash the Salamagotchi (1 time per day)\n"
+        help_text += f"• /salamagotchi{bot_mention} help - Salamagotchi rules and commands\n"
         help_text += f"• /layla{bot_mention} - Send a random Layla image\n"
         help_text += f"• /bored{bot_mention} - Get a random activity suggestion\n"
         help_text += f"• /bored_type{bot_mention} &lt;type&gt; - Get activity by type\n"
@@ -1135,11 +1135,35 @@ class SeleniumArchiveBot:
     def handle_salamagotchi_command(self, command, args, sender_name, sender_username, sender_id, chat_id):
         """Handle Salamagotchi commands."""
         user_display = sender_username or sender_name or f"user_{sender_id}"
+        subcommand = None
+        subcommand_args = args
 
-        if command == "/salamagotchi_spawn":
-            if not args.strip():
-                group_example = f"/salamagotchi_spawn@{self.bot_username} Sal"
-                private_example = "/salamagotchi_spawn Sal"
+        if command == "/salamagotchi":
+            args = args.strip()
+            if not args:
+                subcommand = "status"
+                subcommand_args = ""
+            else:
+                parts = args.split(' ', 1)
+                subcommand = parts[0].lower()
+                subcommand_args = parts[1] if len(parts) > 1 else ""
+        elif command == "/salamagotchi_spawn":
+            subcommand = "spawn"
+        elif command == "/salamagotchi_help":
+            subcommand = "help"
+        else:
+            alias_map = {
+                "/feed": "feed",
+                "/scoop": "scoop",
+                "/play": "play",
+                "/wash": "wash",
+            }
+            subcommand = alias_map.get(command)
+
+        if subcommand == "spawn":
+            if not subcommand_args.strip():
+                group_example = f"/salamagotchi@{self.bot_username} spawn Sal"
+                private_example = "/salamagotchi spawn Sal"
                 return (
                     "<blockquote expandable>🦎 Please provide a name for the Salamagotchi.\n\n"
                     f"<b>Group chat example:</b> {group_example}\n"
@@ -1147,27 +1171,19 @@ class SeleniumArchiveBot:
                     "You cannot spawn a Salamagotchi without naming it.</blockquote>"
                 )
 
-            result = self.salamagotchi_manager.spawn(chat_id, args, user_display)
+            result = self.salamagotchi_manager.spawn(chat_id, subcommand_args, user_display)
             if result['success']:
                 return f"{result['message']}\n\n{result['status_text']}"
             return result['message']
 
-        if command == "/salamagotchi":
+        if subcommand == "status":
             return self.salamagotchi_manager.get_status_text(chat_id)
 
-        if command == "/salamagotchi_help":
+        if subcommand == "help":
             return self.salamagotchi_manager.get_help_text()
 
-        action_map = {
-            "/feed": "feed",
-            "/scoop": "scoop",
-            "/play": "play",
-            "/wash": "wash",
-        }
-
-        action = action_map.get(command)
-        if action:
-            result = self.salamagotchi_manager.perform_action(chat_id, action, user_display)
+        if subcommand in {"feed", "scoop", "play", "wash"}:
+            result = self.salamagotchi_manager.perform_action(chat_id, subcommand, user_display)
             if result.get('status_text'):
                 return f"{result['message']}\n\n{result['status_text']}"
             return result['message']
@@ -2706,13 +2722,12 @@ class SeleniumArchiveBot:
                 {"command": "help", "description": "Show available commands"},
                 {"command": "archive", "description": "Archive a URL"},
                 {"command": "birthday_set", "description": "Set your birthday"},
-                {"command": "salamagotchi_spawn", "description": "Spawn a shared Salamagotchi"},
-                {"command": "salamagotchi", "description": "Show Salamagotchi status"},
+                {"command": "salamagotchi", "description": "Manage the shared Salamagotchi"},
+                {"command": "salamagotchi_help", "description": "Show Salamagotchi rules"},
                 {"command": "feed", "description": "Feed the Salamagotchi"},
                 {"command": "scoop", "description": "Scoop Salamagotchi poop"},
                 {"command": "play", "description": "Play with the Salamagotchi"},
                 {"command": "wash", "description": "Wash the Salamagotchi"},
-                {"command": "salamagotchi_help", "description": "Show Salamagotchi rules"},
                 {"command": "layla", "description": "Send a random Layla image"},
                 {"command": "bored", "description": "Get a random activity suggestion"},
                 {"command": "bored_type", "description": "Get activity by type (education, social, etc.)"},
@@ -2731,13 +2746,12 @@ class SeleniumArchiveBot:
                 {"command": "help", "description": "Show available commands"},
                 {"command": "archive", "description": "Archive a URL"},
                 {"command": "birthday_set", "description": "Set your birthday"},
-                {"command": "salamagotchi_spawn", "description": "Spawn a shared Salamagotchi"},
-                {"command": "salamagotchi", "description": "Show Salamagotchi status"},
+                {"command": "salamagotchi", "description": "Manage the shared Salamagotchi"},
+                {"command": "salamagotchi_help", "description": "Show Salamagotchi rules"},
                 {"command": "feed", "description": "Feed the Salamagotchi"},
                 {"command": "scoop", "description": "Scoop Salamagotchi poop"},
                 {"command": "play", "description": "Play with the Salamagotchi"},
                 {"command": "wash", "description": "Wash the Salamagotchi"},
-                {"command": "salamagotchi_help", "description": "Show Salamagotchi rules"},
                 {"command": "layla", "description": "Send a random Layla image"},
                 {"command": "bored", "description": "Get a random activity suggestion"},
                 {"command": "bored_type", "description": "Get activity by type (education, social, etc.)"},
