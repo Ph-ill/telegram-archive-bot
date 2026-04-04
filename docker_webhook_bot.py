@@ -861,7 +861,10 @@ class SeleniumArchiveBot:
                 if not event['alive']:
                     self.send_message(
                         chat_id,
-                        f"💀 <b>{name}</b> has died of {event['death_reason']}. You can spawn a new Salamagotchi with /pet spawn &lt;name&gt;.",
+                        event.get(
+                            'memorial_text',
+                            f"💀 <b>{name}</b> has died of {event['death_reason']}. You can spawn a new Salamagotchi with /pet spawn &lt;name&gt;."
+                        ),
                         parse_mode='HTML'
                     )
                 elif event.get('stage_changed'):

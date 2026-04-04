@@ -336,6 +336,12 @@ class SalamagotchiManager:
             "education": {},
             "active_study": None,
             "command_log": [],
+            "care_history": {
+                "feed": {},
+                "scoop": {},
+                "play": {},
+                "wash": {},
+            },
         }
 
     def _normalize_pet(self, pet: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -351,6 +357,10 @@ class SalamagotchiManager:
         normalized.setdefault("education", {})
         normalized.setdefault("active_study", None)
         normalized.setdefault("command_log", [])
+        normalized.setdefault("care_history", {})
+        for action in REQUIREMENTS:
+            if not isinstance(normalized["care_history"].get(action), dict):
+                normalized["care_history"][action] = {}
         return normalized
 
     def _format_date(self, iso_value: Optional[str]) -> str:
@@ -460,6 +470,68 @@ class SalamagotchiManager:
             return dt.astimezone(self.timezone).strftime("%Y-%m-%d %H:%M")
         except Exception:
             return "Unknown time"
+
+    def _increment_care_history(self, pet: Dict[str, Any], action: str, user_display: str) -> None:
+        care_history = pet.setdefault("care_history", {})
+        action_history = care_history.setdefault(action, {})
+        action_history[user_display] = action_history.get(user_display, 0) + 1
+
+    def _get_top_caregiver(self, pet: Dict[str, Any], action: str) -> Optional[Tuple[str, int]]:
+        action_history = pet.get("care_history", {}).get(action, {})
+        if not action_history:
+            return None
+        top_user, top_count = max(
+            action_history.items(),
+            key=lambda item: (item[1], item[0].lower()),
+        )
+        return top_user, top_count
+
+    def _build_memories_lines(self, pet: Dict[str, Any]) -> List[str]:
+        memory_specs = [
+            ("feed", "Most feedings"),
+            ("scoop", "Most scooping"),
+            ("play", "Most playtime"),
+            ("wash", "Most baths"),
+        ]
+        lines: List[str] = []
+        for action, label in memory_specs:
+            top_caregiver = self._get_top_caregiver(pet, action)
+            if top_caregiver:
+                user_display, count = top_caregiver
+                lines.append(
+                    f"{label}: {html.escape(user_display)} ({count})"
+                )
+            else:
+                lines.append(f"{label}: No one")
+        return lines
+
+    def _build_memorial_tombstone(self, name: str) -> str:
+        display_name = " ".join(name.split()).strip() or "Sal"
+        display_name = display_name[:14]
+        name_line = display_name.center(14)
+        return (
+            "      _.---._\n"
+            "    .'       '.\n"
+            "   /  R. I. P.  \\\n"
+            "  |              |\n"
+            f"  |{name_line}|\n"
+            "  |              |\n"
+            "  |______________|\n"
+            "     /_/   \\_\\"
+        )
+
+    def build_death_memorial_text(self, pet: Dict[str, Any]) -> str:
+        safe_name = html.escape(pet.get("name", "Salamagotchi"))
+        death_reason = html.escape(pet.get("death_reason", "unknown causes"))
+        tombstone = self._build_memorial_tombstone(pet.get("name", "Salamagotchi"))
+        memories = "\n".join(self._build_memories_lines(pet))
+        return (
+            f"💀 <b>{safe_name}</b> has died of {death_reason}.\n"
+            f"<pre>{html.escape(tombstone)}</pre>\n"
+            f"<blockquote expandable><b>Memories of {safe_name}</b>\n"
+            f"{memories}\n\n"
+            "A new Salamagotchi can be spawned with <code>/pet spawn &lt;name&gt;</code>.</blockquote>"
+        )
 
     def _build_need_phrase(self, pet: Dict[str, Any]) -> Optional[str]:
         name = pet["name"]
@@ -681,6 +753,8 @@ class SalamagotchiManager:
                     "stage_changed": stage_changed,
                     "death_reason": updated_pet.get("death_reason"),
                 }
+                if not updated_pet.get("alive", False):
+                    event["memorial_text"] = self.build_death_memorial_text(updated_pet)
                 events.append(event)
 
             if changed:
@@ -758,6 +832,7 @@ class SalamagotchiManager:
                 }
 
             pet[count_key] = current + 1
+            self._increment_care_history(pet, action, user_display)
             pet["last_interaction_by"] = user_display
             data[str(chat_id)] = pet
             self._write_data(data)
