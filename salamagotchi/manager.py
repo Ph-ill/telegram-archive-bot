@@ -783,7 +783,6 @@ class SalamagotchiManager:
         body_lines: List[str] = []
         body_lines.extend([
             f"{stage_emoji} <b>{safe_name}</b>",
-            f"<b>Status:</b> {status}",
             f"<b>Age:</b> {age_text}",
             f"<b>Stage:</b> {html.escape(stage['name'])}",
         ])
