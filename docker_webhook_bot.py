@@ -97,6 +97,7 @@ class SeleniumArchiveBot:
         # Initialize quiz manager if API key is available
         self.quiz_manager = None
         logger.info(f"Checking GEMINI_API_KEY: {'SET' if self.gemini_api_key else 'NOT SET'}")
+        logger.info(f"Checking DEEPSEEK_API_KEY: {'SET' if self.deepseek_api_key else 'NOT SET'}")
         
         if self.gemini_api_key:
             try:
