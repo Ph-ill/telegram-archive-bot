@@ -983,6 +983,7 @@ class SeleniumArchiveBot:
                 f"Pet name: {pet.get('name', 'Salamagotchi')}\n"
                 f"Age in days: {pet.get('age_days', 0)}\n"
                 f"Stage at death: {self.salamagotchi_manager._get_stage(pet.get('age_days', 0))['name']}\n"
+                f"Gender: {pet.get('gender') or 'unknown'}\n"
                 f"Death reason: {pet.get('death_reason', 'unknown causes')}\n"
                 f"Learned subjects: {', '.join(f'{subject} ({level})' for subject, level in sorted(education.items())) or 'none'}\n"
                 f"Active study at death: {active_study or 'none'}\n"

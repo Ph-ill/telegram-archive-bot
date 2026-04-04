@@ -420,6 +420,7 @@ class SalamagotchiManager:
             },
             "speech_style_example": None,
             "speech_style_taught_by": None,
+            "gender": None,
         }
 
     def _normalize_pet(self, pet: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -441,6 +442,7 @@ class SalamagotchiManager:
                 normalized["care_history"][action] = {}
         normalized.setdefault("speech_style_example", None)
         normalized.setdefault("speech_style_taught_by", None)
+        normalized.setdefault("gender", None)
         return normalized
 
     def _format_date(self, iso_value: Optional[str]) -> str:
@@ -484,7 +486,16 @@ class SalamagotchiManager:
             "death_reason": pet.get("death_reason", "unknown causes"),
             "education": deepcopy(pet.get("education", {})),
             "active_study": deepcopy(pet.get("active_study")),
+            "gender": pet.get("gender"),
         }
+
+    def _assign_gender(self) -> str:
+        roll = random.random()
+        if roll < 0.495:
+            return "male"
+        if roll < 0.99:
+            return "female"
+        return "intersex"
 
     def _record_graveyard_entry(self, pet: Dict[str, Any]) -> Dict[str, Any]:
         pet = self._normalize_pet(pet)
@@ -621,7 +632,13 @@ class SalamagotchiManager:
                 top_actions.append(label)
 
         descriptors = self._join_phrases(top_actions[:3]) if top_actions else "closely watched over"
-        lines = [f"{pet.get('name', 'This pet')} was {descriptors} by the chat."]
+        gender = pet.get("gender")
+        if gender:
+            article = "an" if gender == "intersex" else "a"
+            opening_line = f"{pet.get('name', 'This pet')} was {article} {gender} pet who was {descriptors} by the chat."
+        else:
+            opening_line = f"{pet.get('name', 'This pet')} was a pet who was {descriptors} by the chat."
+        lines = [opening_line]
         custom_commands = []
         built_in_prefixes = {
             "status",
@@ -685,10 +702,13 @@ class SalamagotchiManager:
             "play_count": REQUIREMENTS["play"],
             "wash_count": REQUIREMENTS["wash"],
         }
+        gender_line = ""
+        if stage_name == "Baby" and pet.get("gender"):
+            gender_line = f"\n<b>Assigned Sex:</b> {html.escape(str(pet['gender']).title())}"
         return (
             f"{stage_emoji} <b>{safe_name}</b> has evolved into the <b>{html.escape(stage_name)}</b> stage!\n"
             f"<pre>{html.escape(self._render_stage_art(preview_pet, stage))}</pre>\n"
-            f"<blockquote expandable>{html.escape(flavor)}</blockquote>"
+            f"<blockquote expandable>{html.escape(flavor)}{gender_line}</blockquote>"
         )
 
     def build_death_memorial_text(self, pet: Dict[str, Any]) -> str:
@@ -940,6 +960,8 @@ class SalamagotchiManager:
             pet[f"{action}_count"] = 0
 
         new_stage = self._get_stage(pet.get("age_days", 0))["name"]
+        if previous_stage == "Eggling" and new_stage == "Baby" and not pet.get("gender"):
+            pet["gender"] = self._assign_gender()
         return pet, new_stage != previous_stage
 
     def process_daily_rollovers(self, now: Optional[datetime] = None) -> List[Dict[str, Any]]:
