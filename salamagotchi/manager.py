@@ -748,13 +748,6 @@ class SalamagotchiManager:
 
         return "\n".join(decorated)
 
-    def _render_stage_art_html(self, pet: Dict[str, Any], stage: Dict[str, Any]) -> str:
-        art_lines = self._render_stage_art(pet, stage).splitlines()
-        return "<br>".join(
-            html.escape(line).replace(" ", "&nbsp;")
-            for line in art_lines
-        )
-
     def _build_hint_lines(self, pet: Dict[str, Any]) -> List[str]:
         lines: List[str] = []
         name = pet["name"]
@@ -803,7 +796,7 @@ class SalamagotchiManager:
         if pet.get("alive"):
             body_lines.append(html.escape(self._build_status_phrase(pet)))
 
-        body_lines.append(self._render_stage_art_html(pet, stage))
+        body_lines.append(f"<pre>{html.escape(self._render_stage_art(pet, stage))}</pre>")
 
         hint_lines = self._build_hint_lines(pet) if pet.get("alive") else [
             f"{safe_name} died of {html.escape(pet.get('death_reason', 'unknown causes'))}.",
@@ -811,7 +804,7 @@ class SalamagotchiManager:
         ]
         body_lines.extend(html.escape(line) for line in hint_lines)
 
-        return "\n".join(header_lines + [f"<blockquote expandable>{'<br>'.join(body_lines)}</blockquote>"])
+        return "\n".join(header_lines + [f"<blockquote expandable>{chr(10).join(body_lines)}</blockquote>"])
 
     def _apply_rollover(self, pet: Dict[str, Any], current_date: str) -> Tuple[Dict[str, Any], bool]:
         pet = deepcopy(pet)
