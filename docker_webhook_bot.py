@@ -949,7 +949,7 @@ class SeleniumArchiveBot:
             "buttons, friendly ghosts, and three very strange but delightful blue robots"
         )
 
-    def start_speech_teach(self, chat_id, sender_id, sender_username, sender_name):
+    def start_speech_teach(self, chat_id, sender_id, sender_username, sender_name, reply_to_message_id=None):
         pet = self.salamagotchi_manager.get_pet(chat_id)
         if not pet:
             return "No Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
@@ -958,22 +958,32 @@ class SeleniumArchiveBot:
         if not self.deepseek_api_key:
             return "Speech teaching is unavailable because DEEPSEEK_API_KEY is not configured."
 
+        prompt_text = (
+            "<blockquote expandable>🗣️ Rewrite the following sentence in the way you want the pet to speak.\n\n"
+            f"{self.get_speech_training_sentence()}\n\n"
+            "Reply directly to this message with your rewrite and I will learn that speaking style.</blockquote>"
+        )
+        sent_message = self.send_message(chat_id, prompt_text, reply_to_message_id)
+        if not sent_message or not isinstance(sent_message, dict):
+            return "I couldn't send the speech teaching prompt."
+
         self.pending_speech_teach[chat_id] = {
             "user_id": sender_id,
             "username": sender_username or f"user_{sender_id}",
             "name": sender_name or "User",
+            "prompt_message_id": sent_message.get("message_id"),
         }
-        return (
-            "<blockquote expandable>🗣️ Rewrite the following sentence in the way you want the pet to speak.\n\n"
-            f"{self.get_speech_training_sentence()}\n\n"
-            "Your very next normal message will be used as the pet's speaking style.</blockquote>"
-        )
+        return None
 
-    def process_pending_speech_teach(self, chat_id, text, sender_name, sender_username, sender_id):
+    def process_pending_speech_teach(self, chat_id, text, sender_name, sender_username, sender_id, reply_to_message):
         pending = self.pending_speech_teach.get(chat_id)
         if not pending:
             return None
         if pending.get("user_id") != sender_id:
+            return None
+        if not reply_to_message:
+            return None
+        if reply_to_message.get("message_id") != pending.get("prompt_message_id"):
             return None
         if not text.strip() or text.startswith('/'):
             return None
@@ -2693,6 +2703,7 @@ class SeleniumArchiveBot:
             message_id = message.get('message_id')
             chat_id = message.get('chat', {}).get('id')
             text = message.get('text', '')
+            reply_to_message = message.get('reply_to_message')
             sender = message.get('from', {})
             sender_name = sender.get('first_name', 'User')
             sender_id = sender.get('id')
@@ -2715,6 +2726,7 @@ class SeleniumArchiveBot:
                 sender_name,
                 sender_username,
                 sender_id,
+                reply_to_message,
             )
             if pending_speech_result:
                 self.processed_messages.add(msg_key)
@@ -2748,6 +2760,11 @@ class SeleniumArchiveBot:
                         self.save_processed_messages()
                 else:
                     logger.error(f"Failed to send reply for message {msg_key}")
+            elif text.startswith('/'):
+                self.processed_messages.add(msg_key)
+                logger.info(f"Successfully processed command without reply for message {msg_key}")
+                if len(self.processed_messages) % 10 == 0:
+                    self.save_processed_messages()
             
         except Exception as e:
             logger.error(f"Error processing webhook update: {e}")
