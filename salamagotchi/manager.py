@@ -622,6 +622,7 @@ class SalamagotchiManager:
     def build_death_memorial_text(self, pet: Dict[str, Any]) -> str:
         safe_name = html.escape(pet.get("name", "Salamagotchi"))
         death_reason = html.escape(pet.get("death_reason", "unknown causes"))
+        stage_name = html.escape(self._get_stage(pet.get("age_days", 0))["name"])
         tombstone = self._build_memorial_tombstone(pet.get("name", "Salamagotchi"))
         memories = "\n".join(self._build_memories_lines(pet))
         command_log = pet.get("command_log", [])
@@ -639,6 +640,7 @@ class SalamagotchiManager:
             f"💀 <b>{safe_name}</b> has died of {death_reason}.\n"
             f"<pre>{html.escape(tombstone)}</pre>\n"
             f"<blockquote expandable><b>Memories of {safe_name}</b>\n"
+            f"Stage: {stage_name}\n"
             f"{memories}\n\n"
             "A new Salamagotchi can be spawned with <code>/pet spawn &lt;name&gt;</code>.</blockquote>"
             f"{command_section}"
