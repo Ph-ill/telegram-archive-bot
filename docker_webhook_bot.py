@@ -970,6 +970,8 @@ class SeleniumArchiveBot:
                 "Use the command history and life details to infer the pet's personality and daily life.\n"
                 "Do not repeat commands mechanically.\n"
                 "Compress repetition into broader patterns.\n"
+                "Make a point to include at least one notable custom command that users gave the pet if any exist.\n"
+                "Treat custom commands as the pet's little adventures or errands.\n"
                 "Keep it to 2 or 3 sentences.\n"
                 "Warm, slightly wry, and concise.\n"
                 "Do not mention 'command history' or say you are summarizing logs.\n"

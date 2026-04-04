@@ -614,6 +614,36 @@ class SalamagotchiManager:
 
         descriptors = self._join_phrases(top_actions[:3]) if top_actions else "closely watched over"
         lines = [f"{pet.get('name', 'This pet')} was {descriptors} by the chat."]
+        custom_commands = []
+        built_in_prefixes = {
+            "status",
+            "spawn",
+            "teach_speak",
+            "commands",
+            "graveyard",
+            "help",
+            "feed",
+            "scoop",
+            "play",
+            "wash",
+            "reset",
+            "rename",
+            "kill",
+            "graveyard_remove_last",
+            "memorial_preview",
+            "stage_art",
+            "school",
+        }
+        for entry in pet.get("command_log", []):
+            command_text = str(entry.get("command", "")).strip()
+            if not command_text:
+                continue
+            first_word = command_text.split(" ", 1)[0]
+            if first_word not in built_in_prefixes:
+                custom_commands.append(command_text)
+        if custom_commands:
+            notable_custom = custom_commands[-1]
+            lines.append(f"It was once sent off to {notable_custom}.")
         if subject_count:
             lines.append(f"It completed {subject_count} subject{'s' if subject_count != 1 else ''} before its passing.")
         if speech_lessons:
