@@ -1519,6 +1519,36 @@ class SalamagotchiManager:
             "preview_text": self.build_stage_evolution_text(pet, selected_stage),
         }
 
+    def get_time_to_evolve_text(self, chat_id: int) -> str:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return "No Salamagotchi exists in this chat yet."
+
+        age_days = pet.get("age_days", 0)
+        current_stage = self._get_stage(age_days)
+        next_stage = None
+        for stage in STAGES:
+            if stage["min_age"] > age_days:
+                next_stage = stage
+                break
+
+        safe_name = html.escape(pet.get("name", "Salamagotchi"))
+        if not next_stage:
+            return (
+                f"🐲 <b>{safe_name}</b>\n"
+                f"<blockquote expandable><b>Current Stage:</b> {html.escape(current_stage['name'])}\n"
+                "This pet has already reached its final evolution stage.</blockquote>"
+            )
+
+        days_remaining = next_stage["min_age"] - age_days
+        return (
+            f"⏳ <b>{safe_name}</b>\n"
+            f"<blockquote expandable><b>Current Stage:</b> {html.escape(current_stage['name'])}\n"
+            f"<b>Next Stage:</b> {html.escape(next_stage['name'])}\n"
+            f"<b>Current Age:</b> {age_days} day{'s' if age_days != 1 else ''}\n"
+            f"<b>Time Remaining:</b> {days_remaining} day{'s' if days_remaining != 1 else ''}</blockquote>"
+        )
+
     def get_graveyard_text(self, chat_id: int) -> str:
         pet = self.get_pet(chat_id)
         if not pet or not pet.get("graveyard"):
@@ -1596,6 +1626,7 @@ class SalamagotchiManager:
             f"<code>{command_prefix} status</code> - Show its status, age, and today's needs\n"
             f"<code>{command_prefix} commands</code> - Show the custom command history\n"
             f"<code>{command_prefix} teach_speak</code> - Teach the pet a custom speaking style by replying to its prompt\n"
+            f"<code>{command_prefix} evolve_in</code> - Show how long remains until the next evolution\n"
             f"<code>{command_prefix} spawn &lt;name&gt;</code> - Spawn a new shared Salamagotchi\n"
             f"<code>{command_prefix} feed</code> - Feed it (1 time per day)\n"
             f"<code>{command_prefix} scoop</code> - Scoop poop (1 time per day)\n"

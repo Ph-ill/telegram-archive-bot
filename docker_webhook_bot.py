@@ -749,6 +749,7 @@ class SeleniumArchiveBot:
         help_text += f"• /pet{bot_mention} status - Show Salamagotchi status and today's needs\n"
         help_text += f"• /pet{bot_mention} commands - Show custom commands sent to the pet\n"
         help_text += f"• /pet{bot_mention} teach_speak - Teach the pet a new speaking style by replying to its prompt\n"
+        help_text += f"• /pet{bot_mention} evolve_in - Show how long remains until the next evolution\n"
         help_text += f"• /pet{bot_mention} spawn &lt;name&gt; - Spawn a shared Salamagotchi\n"
         help_text += f"• /pet{bot_mention} feed - Feed the Salamagotchi (1 time per day)\n"
         help_text += f"• /pet{bot_mention} scoop - Scoop poop (1 time per day)\n"
@@ -1413,6 +1414,10 @@ class SeleniumArchiveBot:
         if subcommand == "commands":
             self.salamagotchi_manager.add_command_log(chat_id, user_display, "commands")
             return self.salamagotchi_manager.get_command_log_text(chat_id)
+
+        if subcommand == "evolve_in":
+            self.salamagotchi_manager.add_command_log(chat_id, user_display, "evolve_in")
+            return self.salamagotchi_manager.get_time_to_evolve_text(chat_id)
 
         if subcommand == "graveyard":
             self.salamagotchi_manager.add_command_log(chat_id, user_display, "graveyard")
