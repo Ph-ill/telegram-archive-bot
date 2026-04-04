@@ -779,12 +779,13 @@ class SalamagotchiManager:
         stage_emoji = STAGE_EMOJIS.get(stage["name"], "🦎")
 
         age_text = f"{pet.get('age_days', 0)} day{'s' if pet.get('age_days', 0) != 1 else ''}"
-        header_lines = [
+        art_block = f"<pre>{html.escape(self._render_stage_art(pet, stage))}</pre>"
+        body_lines: List[str] = []
+        body_lines.extend([
             f"{stage_emoji} <b>{safe_name}</b>",
             f"<b>Status:</b> {status}  <b>Age:</b> {age_text}",
             f"<b>Stage:</b> {html.escape(stage['name'])}",
-        ]
-        body_lines: List[str] = []
+        ])
 
         active_study_text = self._format_active_study(pet.get("active_study"))
         if active_study_text:
@@ -804,7 +805,7 @@ class SalamagotchiManager:
         ]
         body_lines.extend(html.escape(line) for line in hint_lines)
 
-        return "\n".join(header_lines + [f"<blockquote expandable>{chr(10).join(body_lines)}</blockquote>"])
+        return "\n".join([art_block, f"<blockquote expandable>{chr(10).join(body_lines)}</blockquote>"])
 
     def _apply_rollover(self, pet: Dict[str, Any], current_date: str) -> Tuple[Dict[str, Any], bool]:
         pet = deepcopy(pet)
