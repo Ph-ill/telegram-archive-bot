@@ -265,6 +265,85 @@ STATUS_ACTIVITIES = [
 
 STATUS_ACTIVITIES.extend(f"{{name}} {activity}" for activity in CURATED_ACTIVITIES)
 
+SPEECH_PREFIXES = [
+    "please",
+    "um",
+    "hey",
+    "excuse me",
+    "hello",
+    "listen",
+    "hi",
+    "dear chat",
+    "tiny request",
+    "important announcement",
+]
+
+HUNGER_LINES = [
+    "my tummy feels empty",
+    "i could really use a snack",
+    "i am thinking about food again",
+    "i would like something tasty",
+    "i am waiting very politely for food",
+    "my little belly is rumbling",
+    "i need a nice meal",
+    "food would improve everything",
+]
+
+SCOOP_LINES = [
+    "my corner is getting embarrassing",
+    "there is a situation on the floor",
+    "someone should really deal with the poop",
+    "things are getting messy over here",
+    "the habitat needs attention",
+    "i am surrounded by avoidable consequences",
+    "the poop problem has become noticeable",
+    "my room is no longer respectable",
+]
+
+PLAY_LINES = [
+    "i need something fun to do",
+    "i want attention right now",
+    "i could use some playtime",
+    "i am feeling bored and dramatic",
+    "please entertain me",
+    "i need a little adventure",
+    "i want to be played with",
+    "i am running low on enrichment",
+]
+
+WASH_LINES = [
+    "i need a bath",
+    "i do not feel fresh",
+    "i could really use a wash",
+    "i am feeling grubby",
+    "bath time would help",
+    "i am not at my cleanest",
+    "i need to be rinsed off",
+    "i am getting a bit stinky",
+]
+
+HAPPY_LINES = [
+    "everything feels nice today",
+    "i am feeling very well looked after",
+    "today has been extremely comfortable",
+    "i feel cherished and tidy",
+    "i have no complaints at all",
+    "life is going unusually well",
+    "i am in excellent little-pet form",
+    "today is treating me kindly",
+]
+
+SPEECH_CLOSERS = [
+    "thank you",
+    "please and thank you",
+    "i would appreciate it",
+    "that is all for now",
+    "i am saying this with love",
+    "kindly address this",
+    "please respond accordingly",
+    "do the right thing",
+]
+
 
 class SalamagotchiManager:
     """Persistent shared-chat Salamagotchi manager."""
@@ -275,6 +354,7 @@ class SalamagotchiManager:
         self.lock = threading.Lock()
         self.timezone_name = timezone_name
         self.timezone = pytz.timezone(timezone_name)
+        self.speech_styler = None
 
         os.makedirs(data_dir, exist_ok=True)
         if not os.path.exists(self.data_file_path):
@@ -342,6 +422,8 @@ class SalamagotchiManager:
                 "play": {},
                 "wash": {},
             },
+            "speech_style_example": None,
+            "speech_style_taught_by": None,
         }
 
     def _normalize_pet(self, pet: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -361,6 +443,8 @@ class SalamagotchiManager:
         for action in REQUIREMENTS:
             if not isinstance(normalized["care_history"].get(action), dict):
                 normalized["care_history"][action] = {}
+        normalized.setdefault("speech_style_example", None)
+        normalized.setdefault("speech_style_taught_by", None)
         return normalized
 
     def _format_date(self, iso_value: Optional[str]) -> str:
@@ -564,6 +648,42 @@ class SalamagotchiManager:
         template = random.choice(STATUS_ACTIVITIES)
         return template.format(name=pet["name"])
 
+    def _build_pet_speech_base(self, pet: Dict[str, Any]) -> str:
+        needs: List[str] = []
+        if pet.get("feed_count", 0) < REQUIREMENTS["feed"]:
+            needs.append(random.choice(HUNGER_LINES))
+        if pet.get("scoop_count", 0) < REQUIREMENTS["scoop"]:
+            needs.append(random.choice(SCOOP_LINES))
+        if pet.get("play_count", 0) < REQUIREMENTS["play"]:
+            needs.append(random.choice(PLAY_LINES))
+        if pet.get("wash_count", 0) < REQUIREMENTS["wash"]:
+            needs.append(random.choice(WASH_LINES))
+
+        if not needs:
+            return (
+                f"{random.choice(SPEECH_PREFIXES)}, {random.choice(HAPPY_LINES)}, "
+                f"{random.choice(SPEECH_CLOSERS)}."
+            )
+
+        return (
+            f"{random.choice(SPEECH_PREFIXES)}, "
+            f"{self._join_phrases(needs)}, "
+            f"{random.choice(SPEECH_CLOSERS)}."
+        )
+
+    def _build_status_phrase(self, pet: Dict[str, Any]) -> str:
+        speech_style_example = pet.get("speech_style_example")
+        if speech_style_example and callable(self.speech_styler):
+            base_line = self._build_pet_speech_base(pet)
+            try:
+                styled_line = self.speech_styler(base_line, speech_style_example)
+                if styled_line:
+                    return styled_line
+            except Exception as e:
+                logger.warning("Failed to style pet speech: %s", e)
+            return base_line
+        return self._build_activity_phrase(pet)
+
     def _render_stage_art(self, pet: Dict[str, Any], stage: Dict[str, Any]) -> str:
         feed_remaining = max(0, REQUIREMENTS["feed"] - pet.get("feed_count", 0))
         scoop_remaining = max(0, REQUIREMENTS["scoop"] - pet.get("scoop_count", 0))
@@ -659,7 +779,7 @@ class SalamagotchiManager:
         if pet.get("alive"):
             lines.extend([
                 "",
-                html.escape(self._build_activity_phrase(pet)),
+                html.escape(self._build_status_phrase(pet)),
             ])
 
         lines.append(f"<pre>{html.escape(self._render_stage_art(pet, stage))}</pre>")
@@ -802,6 +922,40 @@ class SalamagotchiManager:
         if not pet:
             return "No Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
         return self._format_status_text(pet)
+
+    def set_speech_style(self, chat_id: int, style_example: str, user_display: str) -> Dict[str, Any]:
+        cleaned_example = " ".join(style_example.split()).strip()
+        if not cleaned_example:
+            return {
+                "success": False,
+                "message": "Please send a rewritten sentence so I can learn the pet's speaking style.",
+            }
+
+        with self.lock:
+            data = self._read_data()
+            pet = self._normalize_pet(data.get(str(chat_id)))
+            if not pet:
+                return {
+                    "success": False,
+                    "message": "No Salamagotchi exists in this chat yet.",
+                }
+            if not pet.get("alive", False):
+                return {
+                    "success": False,
+                    "message": f"{pet['name']} is dead and cannot learn a new speaking style.",
+                }
+
+            pet["speech_style_example"] = cleaned_example
+            pet["speech_style_taught_by"] = user_display
+            pet["last_interaction_by"] = user_display
+            data[str(chat_id)] = pet
+            self._write_data(data)
+
+        return {
+            "success": True,
+            "message": f"🗣️ {html.escape(pet['name'])} has learned a new way of speaking from {html.escape(user_display)}.",
+            "status_text": self._format_status_text(pet),
+        }
 
     def perform_action(self, chat_id: int, action: str, user_display: str) -> Dict[str, Any]:
         if action not in REQUIREMENTS:
@@ -1262,6 +1416,7 @@ class SalamagotchiManager:
             "<b>Commands</b>\n"
             f"<code>{command_prefix} status</code> - Show its status, age, and today's needs\n"
             f"<code>{command_prefix} commands</code> - Show the custom command history\n"
+            f"<code>{command_prefix} teach_speak</code> - Teach the pet a custom speaking style\n"
             f"<code>{command_prefix} spawn &lt;name&gt;</code> - Spawn a new shared Salamagotchi\n"
             f"<code>{command_prefix} feed</code> - Feed it (1 time per day)\n"
             f"<code>{command_prefix} scoop</code> - Scoop poop (1 time per day)\n"

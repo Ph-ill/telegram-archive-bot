@@ -54,6 +54,8 @@ class SeleniumArchiveBot:
         self.webhook_url = os.environ.get('WEBHOOK_URL')
         self.port = int(os.environ.get('PORT', 8443))
         self.gemini_api_key = os.environ.get('GEMINI_API_KEY')
+        self.deepseek_api_key = os.environ.get('DEEPSEEK_API_KEY')
+        self.deepseek_model = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
         
         if not self.bot_token:
             raise ValueError("BOT_TOKEN environment variable is required")
@@ -75,6 +77,8 @@ class SeleniumArchiveBot:
             self.data_dir,
             os.environ.get('SALAMAGOTCHI_TIMEZONE', 'America/Chicago')
         )
+        self.salamagotchi_manager.speech_styler = self.style_pet_speech_line
+        self.pending_speech_teach = {}
         
         # Flask app for webhook
         self.app = Flask(__name__)
@@ -742,6 +746,7 @@ class SeleniumArchiveBot:
         help_text += "🎯 Activity &amp; Fun Commands:\n"
         help_text += f"• /pet{bot_mention} status - Show Salamagotchi status and today's needs\n"
         help_text += f"• /pet{bot_mention} commands - Show custom commands sent to the pet\n"
+        help_text += f"• /pet{bot_mention} teach_speak - Teach the pet a new speaking style\n"
         help_text += f"• /pet{bot_mention} spawn &lt;name&gt; - Spawn a shared Salamagotchi\n"
         help_text += f"• /pet{bot_mention} feed - Feed the Salamagotchi (1 time per day)\n"
         help_text += f"• /pet{bot_mention} scoop - Scoop poop (1 time per day)\n"
@@ -875,6 +880,106 @@ class SeleniumArchiveBot:
                     )
         except Exception as e:
             logger.error(f"Error processing Salamagotchi rollovers: {e}")
+
+    def style_pet_speech_line(self, base_line, style_example):
+        """Rewrite pet speech in the taught style using DeepSeek."""
+        if not self.deepseek_api_key:
+            return base_line
+
+        try:
+            import requests
+
+            training_sentence = (
+                "While the clever little traveler wandered slowly through the bright yellow "
+                "village, she wrote a surprisingly long letter about rules, rumors, broken "
+                "umbrellas, shiny buttons, friendly ghosts, and three very strange but "
+                "delightful blue robots"
+            )
+            prompt = (
+                "You rewrite a pet's spoken line so it matches a user's taught style.\n"
+                "Use the user's rewrite as the style exemplar.\n"
+                "Keep the meaning of the target line.\n"
+                "Keep it as one sentence.\n"
+                "Keep it short and natural for a Tamagotchi-like pet.\n"
+                "Do not mention the training sentence.\n"
+                "Return only the rewritten line with no explanation.\n\n"
+                f"Original training sentence:\n{training_sentence}\n\n"
+                f"User's rewritten training sentence:\n{style_example}\n\n"
+                f"Target pet line:\n{base_line}"
+            )
+
+            response = requests.post(
+                "https://api.deepseek.com/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.deepseek_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.deepseek_model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are a precise style-transfer assistant for a virtual pet.",
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt,
+                        },
+                    ],
+                    "temperature": 0.8,
+                    "max_tokens": 120,
+                },
+                timeout=20,
+            )
+            response.raise_for_status()
+            data = response.json()
+            content = data["choices"][0]["message"]["content"].strip()
+            if not content:
+                return base_line
+            return " ".join(content.split())
+        except Exception as e:
+            logger.warning(f"DeepSeek speech styling failed: {e}")
+            return base_line
+
+    def get_speech_training_sentence(self):
+        return (
+            "While the clever little traveler wandered slowly through the bright yellow village, "
+            "she wrote a surprisingly long letter about rules, rumors, broken umbrellas, shiny "
+            "buttons, friendly ghosts, and three very strange but delightful blue robots"
+        )
+
+    def start_speech_teach(self, chat_id, sender_id, sender_username, sender_name):
+        pet = self.salamagotchi_manager.get_pet(chat_id)
+        if not pet:
+            return "No Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
+        if not pet.get("alive", False):
+            return f"{pet.get('name', 'Your Salamagotchi')} is dead and cannot learn a new speaking style."
+        if not self.deepseek_api_key:
+            return "Speech teaching is unavailable because DEEPSEEK_API_KEY is not configured."
+
+        self.pending_speech_teach[chat_id] = {
+            "user_id": sender_id,
+            "username": sender_username or f"user_{sender_id}",
+            "name": sender_name or "User",
+        }
+        return (
+            "<blockquote expandable>🗣️ Rewrite the following sentence in the way you want the pet to speak.\n\n"
+            f"{self.get_speech_training_sentence()}\n\n"
+            "Your very next normal message will be used as the pet's speaking style.</blockquote>"
+        )
+
+    def process_pending_speech_teach(self, chat_id, text, sender_name, sender_username, sender_id):
+        pending = self.pending_speech_teach.get(chat_id)
+        if not pending:
+            return None
+        if pending.get("user_id") != sender_id:
+            return None
+        if not text.strip() or text.startswith('/'):
+            return None
+
+        self.pending_speech_teach.pop(chat_id, None)
+        user_display = sender_username or sender_name or f"user_{sender_id}"
+        return self.salamagotchi_manager.set_speech_style(chat_id, text, user_display)
     
     def create_driver(self):
         """Create a headless Chrome driver"""
@@ -1199,6 +1304,9 @@ class SeleniumArchiveBot:
 
         if subcommand == "status":
             return self.salamagotchi_manager.get_status_text(chat_id)
+
+        if subcommand == "teach_speak":
+            return self.start_speech_teach(chat_id, sender_id, sender_username, sender_name)
 
         if subcommand == "commands":
             return self.salamagotchi_manager.get_command_log_text(chat_id)
@@ -2598,6 +2706,28 @@ class SeleniumArchiveBot:
             # Skip if already processed
             if msg_key in self.processed_messages:
                 logger.debug(f"Message {msg_key} already processed, skipping")
+                return
+
+            pending_speech_result = self.process_pending_speech_teach(
+                chat_id,
+                text,
+                sender_name,
+                sender_username,
+                sender_id,
+            )
+            if pending_speech_result:
+                self.processed_messages.add(msg_key)
+                reply_text = pending_speech_result.get("message", "")
+                status_text = pending_speech_result.get("status_text")
+                if status_text:
+                    reply_text = f"{reply_text}\n\n{status_text}"
+                if reply_text:
+                    is_help_message = "Commands:" in reply_text
+                    success = self.send_message(chat_id, reply_text, message_id, disable_web_page_preview=is_help_message)
+                    if success:
+                        logger.info(f"Successfully processed speech training reply for message {msg_key}")
+                        if len(self.processed_messages) % 10 == 0:
+                            self.save_processed_messages()
                 return
             
             # Process slash commands
