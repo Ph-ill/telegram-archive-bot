@@ -959,9 +959,10 @@ class SeleniumArchiveBot:
             return "Speech teaching is unavailable because DEEPSEEK_API_KEY is not configured."
 
         prompt_text = (
-            "<blockquote expandable>🗣️ Rewrite the following sentence in the way you want the pet to speak.\n\n"
+            "<blockquote expandable>🗣️ Reply directly to this message with your rewrite.\n\n"
+            "Rewrite the following sentence in the way you want the pet to speak.\n\n"
             f"{self.get_speech_training_sentence()}\n\n"
-            "Reply directly to this message with your rewrite and I will learn that speaking style.</blockquote>"
+            "I will learn that speaking style from your reply.</blockquote>"
         )
         sent_message = self.send_message(chat_id, prompt_text, reply_to_message_id)
         if not sent_message or not isinstance(sent_message, dict):
