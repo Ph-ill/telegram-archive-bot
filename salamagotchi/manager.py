@@ -791,12 +791,14 @@ class SalamagotchiManager:
         active_study_text = self._format_active_study(pet.get("active_study"))
         if active_study_text:
             body_lines.append(f"<b>Studying:</b> {html.escape(active_study_text)}")
+            body_lines.append("")
 
         if pet.get("education"):
             body_lines.append(f"<b>Learned:</b> {html.escape(self._format_education_summary(pet['education']))}")
 
         if pet.get("alive"):
-            body_lines.append(html.escape(self._build_status_phrase(pet)))
+            body_lines.append(f"<i>{html.escape(self._build_status_phrase(pet))}</i>")
+            body_lines.append("")
 
         hint_lines = self._build_hint_lines(pet) if pet.get("alive") else [
             f"{safe_name} died of {html.escape(pet.get('death_reason', 'unknown causes'))}.",
@@ -804,7 +806,7 @@ class SalamagotchiManager:
         ]
         body_lines.extend(html.escape(line) for line in hint_lines)
 
-        return "\n".join([art_block, f"<blockquote expandable>{chr(10).join(body_lines)}</blockquote>"])
+        return f"{art_block}<blockquote expandable>{chr(10).join(body_lines)}</blockquote>"
 
     def _apply_rollover(self, pet: Dict[str, Any], current_date: str) -> Tuple[Dict[str, Any], bool]:
         pet = deepcopy(pet)
