@@ -783,7 +783,8 @@ class SalamagotchiManager:
         body_lines: List[str] = []
         body_lines.extend([
             f"{stage_emoji} <b>{safe_name}</b>",
-            f"<b>Status:</b> {status}  <b>Age:</b> {age_text}",
+            f"<b>Status:</b> {status}",
+            f"<b>Age:</b> {age_text}",
             f"<b>Stage:</b> {html.escape(stage['name'])}",
         ])
 
@@ -796,8 +797,6 @@ class SalamagotchiManager:
 
         if pet.get("alive"):
             body_lines.append(html.escape(self._build_status_phrase(pet)))
-
-        body_lines.append(f"<pre>{html.escape(self._render_stage_art(pet, stage))}</pre>")
 
         hint_lines = self._build_hint_lines(pet) if pet.get("alive") else [
             f"{safe_name} died of {html.escape(pet.get('death_reason', 'unknown causes'))}.",
