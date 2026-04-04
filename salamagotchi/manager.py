@@ -342,6 +342,7 @@ class SalamagotchiManager:
         self.timezone_name = timezone_name
         self.timezone = pytz.timezone(timezone_name)
         self.speech_styler = None
+        self.memorial_writer = None
 
         os.makedirs(data_dir, exist_ok=True)
         if not os.path.exists(self.data_file_path):
@@ -591,6 +592,34 @@ class SalamagotchiManager:
         command_text = html.escape(entry.get("command", ""))
         return f"[{timestamp}] {user_text} commanded {html.escape(pet_name)} to {command_text}."
 
+    def _build_fallback_obituary_text(self, pet: Dict[str, Any]) -> str:
+        education = pet.get("education", {})
+        subject_count = len(education)
+        speech_lessons = sum(
+            1
+            for entry in pet.get("command_log", [])
+            if str(entry.get("command", "")).startswith("teach_speak sample:")
+        )
+        top_actions = []
+        for action in ("feed", "play", "wash", "scoop"):
+            top_caregiver = self._get_top_caregiver(pet, action)
+            if top_caregiver:
+                label = {
+                    "feed": "well fed",
+                    "play": "well entertained",
+                    "wash": "very clean",
+                    "scoop": "patiently tidied after",
+                }[action]
+                top_actions.append(label)
+
+        descriptors = self._join_phrases(top_actions[:3]) if top_actions else "closely watched over"
+        lines = [f"{pet.get('name', 'This pet')} was {descriptors} by the chat."]
+        if subject_count:
+            lines.append(f"It completed {subject_count} subject{'s' if subject_count != 1 else ''} before its passing.")
+        if speech_lessons:
+            lines.append(f"It was taught to speak {speech_lessons} time{'s' if speech_lessons != 1 else ''}.")
+        return " ".join(lines)
+
     def _build_memorial_tombstone(self, name: str) -> str:
         display_name = " ".join(name.split()).strip() or "Sal"
         display_name = display_name[:14]
@@ -613,6 +642,14 @@ class SalamagotchiManager:
         tombstone = self._build_memorial_tombstone(pet.get("name", "Salamagotchi"))
         memories = "\n".join(self._build_memories_lines(pet))
         command_log = pet.get("command_log", [])
+        obituary_text = self._build_fallback_obituary_text(pet)
+        if callable(self.memorial_writer):
+            try:
+                written_obituary = self.memorial_writer(pet)
+                if written_obituary:
+                    obituary_text = written_obituary
+            except Exception as e:
+                logger.warning("Failed to build memorial obituary text: %s", e)
         command_section = ""
         if command_log:
             command_lines = [
@@ -626,6 +663,7 @@ class SalamagotchiManager:
         return (
             f"💀 <b>{safe_name}</b> has died of {death_reason}.\n"
             f"<pre>{html.escape(tombstone)}</pre>\n"
+            f"<i>{html.escape(obituary_text)}</i>\n"
             f"<blockquote expandable><b>Memories of {safe_name}</b>\n"
             f"Stage: {stage_name}\n"
             f"{memories}\n\n"

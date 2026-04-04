@@ -78,6 +78,7 @@ class SeleniumArchiveBot:
             os.environ.get('SALAMAGOTCHI_TIMEZONE', 'America/Chicago')
         )
         self.salamagotchi_manager.speech_styler = self.style_pet_speech_line
+        self.salamagotchi_manager.memorial_writer = self.write_pet_memorial_obituary
         self.pending_speech_teach = {}
         
         # Flask app for webhook
@@ -947,6 +948,75 @@ class SeleniumArchiveBot:
         except Exception as e:
             logger.warning(f"DeepSeek speech styling failed: {e}")
             return base_line
+
+    def write_pet_memorial_obituary(self, pet):
+        """Write a short obituary-style summary from the pet's history using DeepSeek."""
+        if not self.deepseek_api_key:
+            return None
+
+        try:
+            import requests
+
+            command_lines = []
+            for entry in pet.get("command_log", [])[-80:]:
+                user_text = entry.get("user", "Unknown user")
+                command_text = entry.get("command", "")
+                command_lines.append(f"{user_text}: {command_text}")
+
+            education = pet.get("education", {})
+            active_study = pet.get("active_study")
+            prompt = (
+                "Write a short obituary-style note for a shared chat pet.\n"
+                "Use the command history and life details to infer the pet's personality and daily life.\n"
+                "Do not repeat commands mechanically.\n"
+                "Compress repetition into broader patterns.\n"
+                "Keep it to 2 or 3 sentences.\n"
+                "Warm, slightly wry, and concise.\n"
+                "Do not mention 'command history' or say you are summarizing logs.\n"
+                "Return only the obituary text.\n\n"
+                f"Pet name: {pet.get('name', 'Salamagotchi')}\n"
+                f"Age in days: {pet.get('age_days', 0)}\n"
+                f"Stage at death: {self.salamagotchi_manager._get_stage(pet.get('age_days', 0))['name']}\n"
+                f"Death reason: {pet.get('death_reason', 'unknown causes')}\n"
+                f"Learned subjects: {', '.join(f'{subject} ({level})' for subject, level in sorted(education.items())) or 'none'}\n"
+                f"Active study at death: {active_study or 'none'}\n"
+                f"Speech lessons: {sum(1 for entry in pet.get('command_log', []) if str(entry.get('command', '')).startswith('teach_speak sample:'))}\n"
+                "Recent life history:\n"
+                + "\n".join(command_lines)
+            )
+
+            response = requests.post(
+                "https://api.deepseek.com/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.deepseek_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.deepseek_model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You write concise obituaries for a virtual pet kept alive by a chat.",
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt,
+                        },
+                    ],
+                    "temperature": 0.8,
+                    "max_tokens": 140,
+                },
+                timeout=20,
+            )
+            response.raise_for_status()
+            data = response.json()
+            content = data["choices"][0]["message"]["content"].strip()
+            if not content:
+                return None
+            return " ".join(content.split())
+        except Exception as e:
+            logger.warning(f"DeepSeek memorial obituary generation failed: {e}")
+            return None
 
     def get_speech_training_sentence(self):
         return (
