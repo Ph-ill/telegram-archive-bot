@@ -587,6 +587,15 @@ class SalamagotchiManager:
                 )
             else:
                 lines.append(f"{label}: No one")
+
+        speech_lessons = sum(
+            1
+            for entry in pet.get("command_log", [])
+            if str(entry.get("command", "")).startswith("teach_speak sample:")
+        )
+        learned_subjects = len(pet.get("education", {}))
+        lines.append(f"Speech lessons: {speech_lessons}")
+        lines.append(f"Learned subjects: {learned_subjects}")
         return lines
 
     def _format_command_entry_line(self, pet_name: str, entry: Dict[str, Any]) -> str:
