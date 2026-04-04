@@ -747,7 +747,7 @@ class SeleniumArchiveBot:
         help_text += "🎯 Activity &amp; Fun Commands:\n"
         help_text += f"• /pet{bot_mention} status - Show Salamagotchi status and today's needs\n"
         help_text += f"• /pet{bot_mention} commands - Show custom commands sent to the pet\n"
-        help_text += f"• /pet{bot_mention} teach_speak - Teach the pet a new speaking style\n"
+        help_text += f"• /pet{bot_mention} teach_speak - Teach the pet a new speaking style by replying to its prompt\n"
         help_text += f"• /pet{bot_mention} spawn &lt;name&gt; - Spawn a shared Salamagotchi\n"
         help_text += f"• /pet{bot_mention} feed - Feed the Salamagotchi (1 time per day)\n"
         help_text += f"• /pet{bot_mention} scoop - Scoop poop (1 time per day)\n"
@@ -779,6 +779,11 @@ class SeleniumArchiveBot:
         # Special user commands
         if is_special_user:
             help_text += "👑 Admin Commands (Special Users Only):\n"
+            help_text += f"• /pet{bot_mention} reset - Reset today's care counters\n"
+            help_text += f"• /pet{bot_mention} rename &lt;name&gt; - Rename the current pet\n"
+            help_text += f"• /pet{bot_mention} kill - Forcibly kill the current pet\n"
+            help_text += f"• /pet{bot_mention} memorial_preview - Preview the death memorial without killing it\n"
+            help_text += f"• /pet{bot_mention} graveyard_remove_last - Remove the newest graveyard entry\n"
             help_text += f"• /test_birthday{bot_mention} - Send test birthday message\n"
             help_text += f"• /delete_birthday{bot_mention} &lt;username&gt; - Delete a birthday\n"
             help_text += f"• /list_birthdays{bot_mention} - List all stored birthdays\n"
