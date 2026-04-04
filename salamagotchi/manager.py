@@ -589,6 +589,12 @@ class SalamagotchiManager:
                 lines.append(f"{label}: No one")
         return lines
 
+    def _format_command_entry_line(self, pet_name: str, entry: Dict[str, Any]) -> str:
+        timestamp = self._format_command_timestamp(entry.get("created_at"))
+        user_text = html.escape(entry.get("user", "Unknown user"))
+        command_text = html.escape(entry.get("command", ""))
+        return f"[{timestamp}] {user_text} commanded {html.escape(pet_name)} to {command_text}."
+
     def _build_memorial_tombstone(self, name: str) -> str:
         display_name = " ".join(name.split()).strip() or "Sal"
         display_name = display_name[:14]
@@ -609,12 +615,24 @@ class SalamagotchiManager:
         death_reason = html.escape(pet.get("death_reason", "unknown causes"))
         tombstone = self._build_memorial_tombstone(pet.get("name", "Salamagotchi"))
         memories = "\n".join(self._build_memories_lines(pet))
+        command_log = pet.get("command_log", [])
+        command_section = ""
+        if command_log:
+            command_lines = [
+                self._format_command_entry_line(pet.get("name", "Salamagotchi"), entry)
+                for entry in command_log
+            ]
+            command_section = (
+                "\n\n<b>Command History</b>\n"
+                f"<blockquote expandable>{chr(10).join(command_lines)}</blockquote>"
+            )
         return (
             f"💀 <b>{safe_name}</b> has died of {death_reason}.\n"
             f"<pre>{html.escape(tombstone)}</pre>\n"
             f"<blockquote expandable><b>Memories of {safe_name}</b>\n"
             f"{memories}\n\n"
             "A new Salamagotchi can be spawned with <code>/pet spawn &lt;name&gt;</code>.</blockquote>"
+            f"{command_section}"
         )
 
     def _build_need_phrase(self, pet: Dict[str, Any]) -> Optional[str]:
@@ -1174,7 +1192,7 @@ class SalamagotchiManager:
             "<blockquote expandable>No active study streak right now.</blockquote>"
         )
 
-    def add_custom_command_log(
+    def add_command_log(
         self,
         chat_id: int,
         user_display: str,
@@ -1219,6 +1237,15 @@ class SalamagotchiManager:
             "status_text": self._format_status_text(pet),
         }
 
+    def add_custom_command_log(
+        self,
+        chat_id: int,
+        user_display: str,
+        command_text: str,
+        created_at: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        return self.add_command_log(chat_id, user_display, command_text, created_at)
+
     def get_command_log_text(self, chat_id: int) -> str:
         pet = self.get_pet(chat_id)
         if not pet:
@@ -1230,12 +1257,7 @@ class SalamagotchiManager:
 
         entries = []
         for entry in reversed(command_log):
-            timestamp = self._format_command_timestamp(entry.get("created_at"))
-            user_text = html.escape(entry.get("user", "Unknown user"))
-            command_text = html.escape(entry.get("command", ""))
-            entries.append(
-                f"[{timestamp}] {user_text} commanded {html.escape(pet['name'])} to {command_text}."
-            )
+            entries.append(self._format_command_entry_line(pet['name'], entry))
 
         return (
             f"📜 <b>{html.escape(pet['name'])}'s Command Log</b>\n\n"

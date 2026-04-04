@@ -991,6 +991,11 @@ class SeleniumArchiveBot:
 
         self.pending_speech_teach.pop(chat_id, None)
         user_display = sender_username or sender_name or f"user_{sender_id}"
+        self.salamagotchi_manager.add_command_log(
+            chat_id,
+            user_display,
+            f"teach_speak sample: {text}",
+        )
         return self.salamagotchi_manager.set_speech_style(chat_id, text, user_display)
     
     def create_driver(self):
@@ -1310,20 +1315,26 @@ class SeleniumArchiveBot:
                 )
 
             result = self.salamagotchi_manager.spawn(chat_id, subcommand_args, user_display)
+            if result.get('success'):
+                self.salamagotchi_manager.add_command_log(chat_id, user_display, f"spawn {subcommand_args}")
             if result['success']:
                 return f"{result['message']}\n\n{result['status_text']}"
             return result['message']
 
         if subcommand == "status":
+            self.salamagotchi_manager.add_command_log(chat_id, user_display, "status")
             return self.salamagotchi_manager.get_status_text(chat_id)
 
         if subcommand == "teach_speak":
+            self.salamagotchi_manager.add_command_log(chat_id, user_display, "teach_speak")
             return self.start_speech_teach(chat_id, sender_id, sender_username, sender_name)
 
         if subcommand == "commands":
+            self.salamagotchi_manager.add_command_log(chat_id, user_display, "commands")
             return self.salamagotchi_manager.get_command_log_text(chat_id)
 
         if subcommand == "graveyard":
+            self.salamagotchi_manager.add_command_log(chat_id, user_display, "graveyard")
             return self.salamagotchi_manager.get_graveyard_text(chat_id)
 
         if subcommand == "school":
@@ -1350,17 +1361,22 @@ class SeleniumArchiveBot:
             elif school_command == "upgrade":
                 result = self.salamagotchi_manager.upgrade_school_subject(chat_id, school_subject, user_display)
             elif school_command == "subjects":
+                self.salamagotchi_manager.add_command_log(chat_id, user_display, "school subjects")
                 return self.salamagotchi_manager.get_school_subjects_text(chat_id)
             elif school_command == "status":
+                self.salamagotchi_manager.add_command_log(chat_id, user_display, "school status")
                 return self.salamagotchi_manager.get_school_status_text(chat_id)
             else:
                 return "Unknown school command. Use /pet school start, continue, upgrade, subjects, or status."
 
+            if result.get('success'):
+                self.salamagotchi_manager.add_command_log(chat_id, user_display, f"school {school_command} {school_subject}".strip())
             if result.get('status_text'):
                 return f"{result['message']}\n\n{result['status_text']}"
             return result['message']
 
         if subcommand == "help":
+            self.salamagotchi_manager.add_command_log(chat_id, user_display, "help")
             return self.salamagotchi_manager.get_help_text(
                 bot_username=self.bot_username,
                 is_group_chat=bool(chat_id and chat_id < 0)
@@ -1368,9 +1384,11 @@ class SeleniumArchiveBot:
 
         if subcommand in {"feed", "scoop", "play", "wash"}:
             result = self.salamagotchi_manager.perform_action(chat_id, subcommand, user_display)
+            if result.get('success'):
+                self.salamagotchi_manager.add_command_log(chat_id, user_display, subcommand)
             custom_instruction = subcommand_args.strip()
             if custom_instruction:
-                logged = self.salamagotchi_manager.add_custom_command_log(chat_id, user_display, custom_instruction)
+                logged = self.salamagotchi_manager.add_command_log(chat_id, user_display, custom_instruction)
                 if logged.get("success"):
                     result["message"] = f"{result['message']}\n{logged['message']}"
             if result.get('status_text'):
@@ -1396,8 +1414,11 @@ class SeleniumArchiveBot:
             elif subcommand == "memorial_preview":
                 result = self.salamagotchi_manager.get_death_memorial_preview(chat_id)
             else:
+                self.salamagotchi_manager.add_command_log(chat_id, user_display, "kill")
                 result = self.salamagotchi_manager.force_kill(chat_id, user_display)
 
+            if result.get('success') and subcommand != "kill":
+                self.salamagotchi_manager.add_command_log(chat_id, user_display, f"{subcommand} {subcommand_args}".strip())
             if result.get('memorial_text'):
                 return result['memorial_text']
             if result.get('status_text'):
