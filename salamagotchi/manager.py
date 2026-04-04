@@ -1164,8 +1164,26 @@ class SalamagotchiManager:
 
         return {
             "success": True,
-            "message": f"💀 <b>{html.escape(pet['name'])}</b> has been killed.",
-            "status_text": self._format_status_text(pet),
+            "memorial_text": self.build_death_memorial_text(pet),
+        }
+
+    def get_death_memorial_preview(self, chat_id: int) -> Dict[str, Any]:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return {
+                "success": False,
+                "message": "No Salamagotchi exists in this chat yet.",
+            }
+
+        preview_pet = deepcopy(pet)
+        if preview_pet.get("alive", False):
+            preview_pet["death_reason"] = preview_pet.get("death_reason") or "admin intervention"
+        preview_pet["alive"] = False
+        preview_pet["died_at"] = preview_pet.get("died_at") or datetime.now(pytz.UTC).isoformat()
+
+        return {
+            "success": True,
+            "memorial_text": self.build_death_memorial_text(preview_pet),
         }
 
     def get_graveyard_text(self, chat_id: int) -> str:
@@ -1260,6 +1278,7 @@ class SalamagotchiManager:
             f"<code>{command_prefix} reset</code> - Reset today's care counters\n"
             f"<code>{command_prefix} rename &lt;name&gt;</code> - Rename the current pet\n"
             f"<code>{command_prefix} kill</code> - Forcibly kill the current pet\n\n"
+            f"<code>{command_prefix} memorial_preview</code> - Preview the death memorial without killing it\n\n"
             f"<code>{command_prefix} graveyard_remove_last</code> - Remove the newest graveyard entry\n\n"
             "<b>Rules</b>\n"
             "• One shared Salamagotchi per chat\n"
