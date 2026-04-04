@@ -1541,12 +1541,25 @@ class SalamagotchiManager:
             )
 
         days_remaining = next_stage["min_age"] - age_days
+        now = datetime.now(pytz.UTC).astimezone(self.timezone)
+        next_midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        evolution_time = next_midnight + timedelta(days=max(0, days_remaining - 1))
+        remaining_delta = evolution_time - now
+        total_minutes = max(0, int(remaining_delta.total_seconds() // 60))
+        remaining_days = total_minutes // (24 * 60)
+        remaining_hours = (total_minutes % (24 * 60)) // 60
+        remaining_minutes = total_minutes % 60
+        remaining_text = (
+            f"{remaining_days} day{'s' if remaining_days != 1 else ''}, "
+            f"{remaining_hours} hour{'s' if remaining_hours != 1 else ''}, "
+            f"{remaining_minutes} minute{'s' if remaining_minutes != 1 else ''}"
+        )
         return (
             f"⏳ <b>{safe_name}</b>\n"
             f"<blockquote expandable><b>Current Stage:</b> {html.escape(current_stage['name'])}\n"
             f"<b>Next Stage:</b> {html.escape(next_stage['name'])}\n"
             f"<b>Current Age:</b> {age_days} day{'s' if age_days != 1 else ''}\n"
-            f"<b>Time Remaining:</b> {days_remaining} day{'s' if days_remaining != 1 else ''}</blockquote>"
+            f"<b>Time Remaining:</b> {remaining_text}</blockquote>"
         )
 
     def get_graveyard_text(self, chat_id: int) -> str:
