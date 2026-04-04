@@ -783,6 +783,7 @@ class SeleniumArchiveBot:
             help_text += f"• /pet{bot_mention} rename &lt;name&gt; - Rename the current pet\n"
             help_text += f"• /pet{bot_mention} kill - Forcibly kill the current pet\n"
             help_text += f"• /pet{bot_mention} memorial_preview - Preview the death memorial without killing it\n"
+            help_text += f"• /pet{bot_mention} stage_art - Preview the ASCII art for every life stage\n"
             help_text += f"• /pet{bot_mention} graveyard_remove_last - Remove the newest graveyard entry\n"
             help_text += f"• /test_birthday{bot_mention} - Send test birthday message\n"
             help_text += f"• /delete_birthday{bot_mention} &lt;username&gt; - Delete a birthday\n"
@@ -1400,7 +1401,7 @@ class SeleniumArchiveBot:
                 return f"{result['message']}\n\n{result['status_text']}"
             return result['message']
 
-        if subcommand in {"reset", "rename", "kill", "graveyard_remove_last", "memorial_preview"}:
+        if subcommand in {"reset", "rename", "kill", "graveyard_remove_last", "memorial_preview", "stage_art"}:
             if sender_username.lower() not in special_users:
                 return "This Salamagotchi command is only available to administrators."
 
@@ -1418,6 +1419,9 @@ class SeleniumArchiveBot:
                 result = self.salamagotchi_manager.remove_latest_graveyard_entry(chat_id)
             elif subcommand == "memorial_preview":
                 result = self.salamagotchi_manager.get_death_memorial_preview(chat_id)
+            elif subcommand == "stage_art":
+                self.salamagotchi_manager.add_command_log(chat_id, user_display, "stage_art")
+                return self.salamagotchi_manager.get_stage_art_preview_text()
             else:
                 self.salamagotchi_manager.add_command_log(chat_id, user_display, "kill")
                 result = self.salamagotchi_manager.force_kill(chat_id, user_display)

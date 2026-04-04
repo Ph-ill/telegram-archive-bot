@@ -1371,6 +1371,22 @@ class SalamagotchiManager:
             "memorial_text": self.build_death_memorial_text(preview_pet),
         }
 
+    def get_stage_art_preview_text(self) -> str:
+        preview_pet = {
+            "alive": True,
+            "feed_count": REQUIREMENTS["feed"],
+            "scoop_count": REQUIREMENTS["scoop"],
+            "play_count": REQUIREMENTS["play"],
+            "wash_count": REQUIREMENTS["wash"],
+        }
+
+        lines = ["🖼️ <b>Salamagotchi Stage Art Preview</b>"]
+        for stage in STAGES:
+            lines.append(
+                f"\n<b>{html.escape(stage['name'])}</b>\n<pre>{html.escape(self._render_stage_art(preview_pet, stage))}</pre>"
+            )
+        return "\n".join(lines)
+
     def get_graveyard_text(self, chat_id: int) -> str:
         pet = self.get_pet(chat_id)
         if not pet or not pet.get("graveyard"):
@@ -1465,6 +1481,7 @@ class SalamagotchiManager:
             f"<code>{command_prefix} rename &lt;name&gt;</code> - Rename the current pet\n"
             f"<code>{command_prefix} kill</code> - Forcibly kill the current pet\n\n"
             f"<code>{command_prefix} memorial_preview</code> - Preview the death memorial without killing it\n\n"
+            f"<code>{command_prefix} stage_art</code> - Preview the ASCII art for every life stage\n\n"
             f"<code>{command_prefix} graveyard_remove_last</code> - Remove the newest graveyard entry\n\n"
             "<b>Rules</b>\n"
             "• One shared Salamagotchi per chat\n"
