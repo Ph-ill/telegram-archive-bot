@@ -146,6 +146,14 @@ STAGE_EMOJIS = {
     "Elder": "🐲",
 }
 
+EVOLUTION_FLAVOR = {
+    "Baby": "The shell finally gives way and a tiny hatchling wriggles into the world.",
+    "Child": "Its limbs steady, its tail lengthens, and it starts looking like a proper little salamander.",
+    "Teen": "It shoots upward into an awkward, speedy adolescent with far too much energy.",
+    "Adult": "It settles into its full shape at last, proud, long-tailed, and unmistakably grown.",
+    "Elder": "Age lends it a strange dignity, as if it has become some ancient little marsh creature.",
+}
+
 ACTIVITY_VERBS = [
     "is lingering",
     "is loitering",
@@ -665,6 +673,24 @@ class SalamagotchiManager:
             "     /_/   \\_\\"
         )
 
+    def build_stage_evolution_text(self, pet: Dict[str, Any], stage_name: str) -> str:
+        safe_name = html.escape(pet.get("name", "Salamagotchi"))
+        stage = next((stage for stage in STAGES if stage["name"] == stage_name), self._get_stage(pet.get("age_days", 0)))
+        stage_emoji = STAGE_EMOJIS.get(stage_name, "🦎")
+        flavor = EVOLUTION_FLAVOR.get(stage_name, f"{safe_name} has reached a new stage of life.")
+        preview_pet = {
+            "alive": True,
+            "feed_count": REQUIREMENTS["feed"],
+            "scoop_count": REQUIREMENTS["scoop"],
+            "play_count": REQUIREMENTS["play"],
+            "wash_count": REQUIREMENTS["wash"],
+        }
+        return (
+            f"{stage_emoji} <b>{safe_name}</b> has evolved into the <b>{html.escape(stage_name)}</b> stage!\n"
+            f"<pre>{html.escape(self._render_stage_art(preview_pet, stage))}</pre>\n"
+            f"<blockquote expandable>{html.escape(flavor)}</blockquote>"
+        )
+
     def build_death_memorial_text(self, pet: Dict[str, Any]) -> str:
         safe_name = html.escape(pet.get("name", "Salamagotchi"))
         death_reason = html.escape(pet.get("death_reason", "unknown causes"))
@@ -958,6 +984,8 @@ class SalamagotchiManager:
                 }
                 if not updated_pet.get("alive", False):
                     event["memorial_text"] = self.build_death_memorial_text(updated_pet)
+                elif stage_changed:
+                    event["evolution_text"] = self.build_stage_evolution_text(updated_pet, event["stage"])
                 events.append(event)
 
             if changed:
@@ -1468,6 +1496,29 @@ class SalamagotchiManager:
             )
         return "\n".join(lines)
 
+    def get_evolution_preview_text(self, chat_id: int, stage_name: Optional[str] = None) -> Dict[str, Any]:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return {"success": False, "message": "No Salamagotchi exists in this chat yet."}
+
+        selected_stage = None
+        if stage_name:
+            stage_name = stage_name.strip().lower()
+            for stage in STAGES:
+                if stage["name"].lower() == stage_name:
+                    selected_stage = stage["name"]
+                    break
+            if not selected_stage:
+                valid = ", ".join(stage["name"] for stage in STAGES)
+                return {"success": False, "message": f"Unknown stage. Use one of: {valid}."}
+        else:
+            selected_stage = self._get_stage(pet.get("age_days", 0))["name"]
+
+        return {
+            "success": True,
+            "preview_text": self.build_stage_evolution_text(pet, selected_stage),
+        }
+
     def get_graveyard_text(self, chat_id: int) -> str:
         pet = self.get_pet(chat_id)
         if not pet or not pet.get("graveyard"):
@@ -1562,6 +1613,7 @@ class SalamagotchiManager:
             f"<code>{command_prefix} rename &lt;name&gt;</code> - Rename the current pet\n"
             f"<code>{command_prefix} kill</code> - Forcibly kill the current pet\n\n"
             f"<code>{command_prefix} memorial_preview</code> - Preview the death memorial without killing it\n\n"
+            f"<code>{command_prefix} evolution_preview [stage]</code> - Preview a stage evolution announcement\n\n"
             f"<code>{command_prefix} stage_art</code> - Preview the ASCII art for every life stage\n\n"
             f"<code>{command_prefix} graveyard_remove_last</code> - Remove the newest graveyard entry\n\n"
             "<b>Rules</b>\n"

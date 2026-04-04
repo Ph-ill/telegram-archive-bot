@@ -784,6 +784,7 @@ class SeleniumArchiveBot:
             help_text += f"• /pet{bot_mention} rename &lt;name&gt; - Rename the current pet\n"
             help_text += f"• /pet{bot_mention} kill - Forcibly kill the current pet\n"
             help_text += f"• /pet{bot_mention} memorial_preview - Preview the death memorial without killing it\n"
+            help_text += f"• /pet{bot_mention} evolution_preview [stage] - Preview a stage evolution announcement\n"
             help_text += f"• /pet{bot_mention} stage_art - Preview the ASCII art for every life stage\n"
             help_text += f"• /pet{bot_mention} graveyard_remove_last - Remove the newest graveyard entry\n"
             help_text += f"• /test_birthday{bot_mention} - Send test birthday message\n"
@@ -883,7 +884,10 @@ class SeleniumArchiveBot:
                 elif event.get('stage_changed'):
                     self.send_message(
                         chat_id,
-                        f"🌱 <b>{name}</b> survived another day and grew into the <b>{event['stage']}</b> stage!",
+                        event.get(
+                            'evolution_text',
+                            f"🌱 <b>{name}</b> survived another day and grew into the <b>{event['stage']}</b> stage!"
+                        ),
                         parse_mode='HTML'
                     )
         except Exception as e:
@@ -1472,7 +1476,7 @@ class SeleniumArchiveBot:
                 return f"{result['message']}\n\n{result['status_text']}"
             return result['message']
 
-        if subcommand in {"reset", "rename", "kill", "graveyard_remove_last", "memorial_preview", "stage_art"}:
+        if subcommand in {"reset", "rename", "kill", "graveyard_remove_last", "memorial_preview", "stage_art", "evolution_preview"}:
             if sender_username.lower() not in special_users:
                 return "This Salamagotchi command is only available to administrators."
 
@@ -1490,6 +1494,11 @@ class SeleniumArchiveBot:
                 result = self.salamagotchi_manager.remove_latest_graveyard_entry(chat_id)
             elif subcommand == "memorial_preview":
                 result = self.salamagotchi_manager.get_death_memorial_preview(chat_id)
+            elif subcommand == "evolution_preview":
+                self.salamagotchi_manager.add_command_log(chat_id, user_display, f"evolution_preview {subcommand_args}".strip())
+                result = self.salamagotchi_manager.get_evolution_preview_text(chat_id, subcommand_args)
+                if result.get("preview_text"):
+                    return result["preview_text"]
             elif subcommand == "stage_art":
                 self.salamagotchi_manager.add_command_log(chat_id, user_display, "stage_art")
                 return self.salamagotchi_manager.get_stage_art_preview_text()
