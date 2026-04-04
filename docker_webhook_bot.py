@@ -1437,7 +1437,7 @@ class SeleniumArchiveBot:
                             logger.info(f"Scheduling memorial preview message {preview_message_id} for deletion in chat {chat_id} after 30 seconds")
                             timer = threading.Timer(
                                 30,
-                                target=self.delete_preview_message_after_delay,
+                                self.delete_preview_message_after_delay,
                                 args=(chat_id, preview_message_id),
                             )
                             timer.daemon = True
