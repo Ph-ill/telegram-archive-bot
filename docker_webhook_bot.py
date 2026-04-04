@@ -1434,11 +1434,16 @@ class SeleniumArchiveBot:
                     if sent_message and isinstance(sent_message, dict):
                         preview_message_id = sent_message.get('message_id')
                         if preview_message_id:
-                            threading.Thread(
+                            logger.info(f"Scheduling memorial preview message {preview_message_id} for deletion in chat {chat_id} after 30 seconds")
+                            timer = threading.Timer(
+                                30,
                                 target=self.delete_preview_message_after_delay,
-                                args=(chat_id, preview_message_id, 30),
-                                daemon=True,
-                            ).start()
+                                args=(chat_id, preview_message_id),
+                            )
+                            timer.daemon = True
+                            timer.start()
+                    else:
+                        logger.warning(f"Memorial preview message could not be scheduled for deletion because send_message returned {type(sent_message).__name__}")
                     return None
                 return result['memorial_text']
             if result.get('status_text'):
@@ -1456,10 +1461,10 @@ class SeleniumArchiveBot:
 
         return "Unknown Salamagotchi command."
 
-    def delete_preview_message_after_delay(self, chat_id, message_id, delay_seconds):
+    def delete_preview_message_after_delay(self, chat_id, message_id):
         """Delete a preview message after a short delay."""
         try:
-            time.sleep(delay_seconds)
+            logger.info(f"Attempting scheduled deletion for memorial preview message {message_id} in chat {chat_id}")
             self.delete_message(chat_id, message_id)
         except Exception as e:
             logger.error(f"Failed to delete preview message {message_id} in chat {chat_id}: {e}")
