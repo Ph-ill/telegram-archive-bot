@@ -1429,6 +1429,17 @@ class SeleniumArchiveBot:
             if result.get('success') and subcommand != "kill":
                 self.salamagotchi_manager.add_command_log(chat_id, user_display, f"{subcommand} {subcommand_args}".strip())
             if result.get('memorial_text'):
+                if subcommand == "memorial_preview":
+                    sent_message = self.send_message(chat_id, result['memorial_text'])
+                    if sent_message and isinstance(sent_message, dict):
+                        preview_message_id = sent_message.get('message_id')
+                        if preview_message_id:
+                            threading.Thread(
+                                target=self.delete_preview_message_after_delay,
+                                args=(chat_id, preview_message_id, 30),
+                                daemon=True,
+                            ).start()
+                    return None
                 return result['memorial_text']
             if result.get('status_text'):
                 return f"{result['message']}\n\n{result['status_text']}"
@@ -1444,6 +1455,14 @@ class SeleniumArchiveBot:
             return result['message']
 
         return "Unknown Salamagotchi command."
+
+    def delete_preview_message_after_delay(self, chat_id, message_id, delay_seconds):
+        """Delete a preview message after a short delay."""
+        try:
+            time.sleep(delay_seconds)
+            self.delete_message(chat_id, message_id)
+        except Exception as e:
+            logger.error(f"Failed to delete preview message {message_id} in chat {chat_id}: {e}")
     
     def handle_layla_command(self, chat_id):
         """Handle /layla command - send random image from layla_images folder"""
