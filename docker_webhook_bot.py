@@ -2767,7 +2767,7 @@ class SeleniumArchiveBot:
                     reply_text = f"{reply_text}\n\n{status_text}"
                 if reply_text:
                     is_help_message = "Commands:" in reply_text
-                    success = self.send_message(chat_id, reply_text, message_id, disable_web_page_preview=is_help_message)
+                    success = self.send_message(chat_id, reply_text, disable_web_page_preview=is_help_message)
                     if success:
                         logger.info(f"Successfully processed speech training reply for message {msg_key}")
                         if len(self.processed_messages) % 10 == 0:
@@ -2783,7 +2783,7 @@ class SeleniumArchiveBot:
                 # Send reply (disable web page preview for all help messages)
                 is_help_message = ("/help" in text.lower() or "/start" in text.lower() or 
                                  "/quiz_help" in text.lower() or "Commands:" in reply_text)
-                success = self.send_message(chat_id, reply_text, message_id, disable_web_page_preview=is_help_message)
+                success = self.send_message(chat_id, reply_text, disable_web_page_preview=is_help_message)
                 if success:
                     logger.info(f"Successfully processed and replied to message {msg_key}")
                     # Save processed messages periodically
