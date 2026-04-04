@@ -958,7 +958,7 @@ class SeleniumArchiveBot:
             import requests
 
             command_lines = []
-            for entry in pet.get("command_log", [])[-80:]:
+            for entry in pet.get("command_log", [])[-250:]:
                 user_text = entry.get("user", "Unknown user")
                 command_text = entry.get("command", "")
                 command_lines.append(f"{user_text}: {command_text}")
@@ -966,16 +966,15 @@ class SeleniumArchiveBot:
             education = pet.get("education", {})
             active_study = pet.get("active_study")
             prompt = (
-                "Write a short obituary-style note for a shared chat pet.\n"
-                "Use the command history and life details to infer the pet's personality and daily life.\n"
-                "Do not repeat commands mechanically.\n"
-                "Compress repetition into broader patterns.\n"
+                "Write a single short obituary-style paragraph for a shared chat pet.\n"
+                "Use the full command history and life details to infer the pet's personality, routines, and little adventures.\n"
+                "Do your best to summarize repeated behavior into broader patterns instead of repeating similar events.\n"
                 "Make a point to include at least one notable custom command that users gave the pet if any exist.\n"
                 "Treat custom commands as the pet's little adventures or errands.\n"
-                "Keep it to 2 or 3 sentences.\n"
-                "Warm, slightly wry, and concise.\n"
+                "Keep it concise and not exceedingly long.\n"
+                "Warm, slightly wry, and natural.\n"
                 "Do not mention 'command history' or say you are summarizing logs.\n"
-                "Return only the obituary text.\n\n"
+                "Return only the paragraph.\n\n"
                 f"Pet name: {pet.get('name', 'Salamagotchi')}\n"
                 f"Age in days: {pet.get('age_days', 0)}\n"
                 f"Stage at death: {self.salamagotchi_manager._get_stage(pet.get('age_days', 0))['name']}\n"
@@ -1006,7 +1005,7 @@ class SeleniumArchiveBot:
                         },
                     ],
                     "temperature": 0.8,
-                    "max_tokens": 140,
+                    "max_tokens": 180,
                 },
                 timeout=20,
             )
