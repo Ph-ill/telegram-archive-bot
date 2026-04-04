@@ -778,35 +778,33 @@ class SalamagotchiManager:
         status = "Alive" if pet.get("alive") else "Dead"
         stage_emoji = STAGE_EMOJIS.get(stage["name"], "🦎")
 
-        lines = [
+        age_text = f"{pet.get('age_days', 0)} day{'s' if pet.get('age_days', 0) != 1 else ''}"
+        header_lines = [
             f"{stage_emoji} <b>{safe_name}</b>",
-            f"<b>Status:</b> {status}",
-            f"<b>Age:</b> {pet.get('age_days', 0)} day{'s' if pet.get('age_days', 0) != 1 else ''}",
+            f"<b>Status:</b> {status}  <b>Age:</b> {age_text}",
             f"<b>Stage:</b> {html.escape(stage['name'])}",
         ]
+        body_lines: List[str] = []
 
         active_study_text = self._format_active_study(pet.get("active_study"))
         if active_study_text:
-            lines.append(f"<b>Studying:</b> {html.escape(active_study_text)}")
+            body_lines.append(f"<b>Studying:</b> {html.escape(active_study_text)}")
 
         if pet.get("education"):
-            lines.append(f"<b>Learned:</b> {html.escape(self._format_education_summary(pet['education']))}")
+            body_lines.append(f"<b>Learned:</b> {html.escape(self._format_education_summary(pet['education']))}")
 
         if pet.get("alive"):
-            lines.extend([
-                "",
-                html.escape(self._build_status_phrase(pet)),
-            ])
+            body_lines.append(html.escape(self._build_status_phrase(pet)))
 
-        lines.append(f"<pre>{html.escape(self._render_stage_art(pet, stage))}</pre>")
+        body_lines.append(f"<pre>{html.escape(self._render_stage_art(pet, stage))}</pre>")
 
         hint_lines = self._build_hint_lines(pet) if pet.get("alive") else [
             f"{safe_name} died of {html.escape(pet.get('death_reason', 'unknown causes'))}.",
             "A new Salamagotchi can be spawned in this chat.",
         ]
-        lines.extend(html.escape(line) for line in hint_lines)
+        body_lines.extend(html.escape(line) for line in hint_lines)
 
-        return "\n".join(lines)
+        return "\n".join(header_lines + [f"<blockquote expandable>{chr(10).join(body_lines)}</blockquote>"])
 
     def _apply_rollover(self, pet: Dict[str, Any], current_date: str) -> Tuple[Dict[str, Any], bool]:
         pet = deepcopy(pet)
