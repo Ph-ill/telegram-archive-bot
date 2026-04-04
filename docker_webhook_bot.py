@@ -137,6 +137,10 @@ class SeleniumArchiveBot:
         except Exception as e:
             logger.error(f"Error getting bot username: {e}")
             return "Angel_Dimi_Bot"  # Fallback
+
+    def append_compact_pet_status(self, message, chat_id):
+        compact_status = self.salamagotchi_manager.get_compact_status_text(chat_id)
+        return f"{message}\n\n{compact_status}"
     
     def signal_handler(self, signum, frame):
         """Handle graceful shutdown"""
@@ -1324,7 +1328,7 @@ class SeleniumArchiveBot:
             if result.get('success'):
                 self.salamagotchi_manager.add_command_log(chat_id, user_display, f"spawn {subcommand_args}")
             if result['success']:
-                return f"{result['message']}\n\n{result['status_text']}"
+                return self.append_compact_pet_status(result['message'], chat_id)
             return result['message']
 
         if subcommand == "status":
@@ -1378,7 +1382,7 @@ class SeleniumArchiveBot:
             if result.get('success'):
                 self.salamagotchi_manager.add_command_log(chat_id, user_display, f"school {school_command} {school_subject}".strip())
             if result.get('status_text'):
-                return f"{result['message']}\n\n{result['status_text']}"
+                return self.append_compact_pet_status(result['message'], chat_id)
             return result['message']
 
         if subcommand == "help":
@@ -1398,7 +1402,7 @@ class SeleniumArchiveBot:
                 if logged.get("success"):
                     result["message"] = f"{result['message']}\n{logged['message']}"
             if result.get('status_text'):
-                return f"{result['message']}\n\n{result['status_text']}"
+                return self.append_compact_pet_status(result['message'], chat_id)
             return result['message']
 
         if subcommand in {"reset", "rename", "kill", "graveyard_remove_last", "memorial_preview", "stage_art"}:
@@ -1431,7 +1435,7 @@ class SeleniumArchiveBot:
             if result.get('memorial_text'):
                 return result['memorial_text']
             if result.get('status_text'):
-                return f"{result['message']}\n\n{result['status_text']}"
+                return self.append_compact_pet_status(result['message'], chat_id)
             if result.get('graveyard_text'):
                 return f"{result['message']}\n\n{result['graveyard_text']}"
             return result['message']

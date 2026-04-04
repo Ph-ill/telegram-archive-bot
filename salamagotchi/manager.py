@@ -937,6 +937,31 @@ class SalamagotchiManager:
             return "No Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
         return self._format_status_text(pet)
 
+    def get_compact_status_text(self, chat_id: int) -> str:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return "No Salamagotchi exists in this chat yet."
+
+        stage = self._get_stage(pet.get("age_days", 0))
+        status = "Alive" if pet.get("alive") else "Dead"
+        stage_emoji = STAGE_EMOJIS.get(stage["name"], "🦎")
+        safe_name = html.escape(pet.get("name", "Salamagotchi"))
+        age_text = f"{pet.get('age_days', 0)} day{'s' if pet.get('age_days', 0) != 1 else ''}"
+
+        lines = [
+            f"{stage_emoji} <b>{safe_name}</b>",
+            f"<b>Status:</b> {status}  <b>Age:</b> {age_text}",
+            f"<b>Stage:</b> {html.escape(stage['name'])}",
+        ]
+
+        active_study_text = self._format_active_study(pet.get("active_study"))
+        if active_study_text:
+            lines.append(f"<b>Studying:</b> {html.escape(active_study_text)}")
+
+        need_phrase = self._build_need_phrase(pet) if pet.get("alive") else f"{safe_name} died of {html.escape(pet.get('death_reason', 'unknown causes'))}."
+        lines.append(html.escape(need_phrase))
+        return "\n".join(lines)
+
     def set_speech_style(self, chat_id: int, style_example: str, user_display: str) -> Dict[str, Any]:
         cleaned_example = " ".join(style_example.split()).strip()
         if not cleaned_example:
