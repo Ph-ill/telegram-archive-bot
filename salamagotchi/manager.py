@@ -1523,6 +1523,7 @@ class SalamagotchiManager:
         if not pet:
             return {"success": False, "message": "No Salamagotchi exists in this chat yet."}
 
+        preview_pet = deepcopy(pet)
         selected_stage = None
         if stage_name:
             stage_name = stage_name.strip().lower()
@@ -1534,11 +1535,16 @@ class SalamagotchiManager:
                 valid = ", ".join(stage["name"] for stage in STAGES)
                 return {"success": False, "message": f"Unknown stage. Use one of: {valid}."}
         else:
-            selected_stage = self._get_stage(pet.get("age_days", 0))["name"]
+            current_age = pet.get("age_days", 0)
+            next_stage = next((stage for stage in STAGES if stage["min_age"] > current_age), None)
+            selected_stage = next_stage["name"] if next_stage else self._get_stage(current_age)["name"]
+
+        if selected_stage == "Baby" and not preview_pet.get("gender"):
+            preview_pet["gender"] = self._assign_gender()
 
         return {
             "success": True,
-            "preview_text": self.build_stage_evolution_text(pet, selected_stage),
+            "preview_text": self.build_stage_evolution_text(preview_pet, selected_stage),
         }
 
     def get_time_to_evolve_text(self, chat_id: int) -> str:
