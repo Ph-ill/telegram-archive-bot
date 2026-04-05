@@ -913,6 +913,16 @@ class SeleniumArchiveBot:
         stage_name = html.escape(self.salamagotchi_manager._get_stage(pet.get("age_days", 0))["name"])
         return f"✨ <b>{pet_name}</b> has evolved successfully and is now a <b>{stage_name}</b>."
 
+    def build_salamagotchi_memorial_response(self, chat_id, memorial_text):
+        payload = self.salamagotchi_manager.get_memorial_payload(chat_id, memorial_text)
+        if payload:
+            return {
+                "type": "sticker",
+                "sticker_path": payload["sticker_path"],
+                "text": payload["text"],
+            }
+        return memorial_text
+
     def schedule_salamagotchi_evolution_completion(self, chat_id, delay_seconds):
         """Schedule the completion announcement for a live evolution."""
         existing_timer = self.pending_evolution_timers.pop(chat_id, None)
@@ -999,13 +1009,15 @@ class SeleniumArchiveBot:
                 chat_id = event['chat_id']
                 name = event['name']
                 if not event['alive']:
-                    self.send_message(
+                    self.send_bot_response(
                         chat_id,
-                        event.get(
-                            'memorial_text',
-                            f"💀 <b>{name}</b> has died of {event['death_reason']}. You can spawn a new Salamagotchi with /pet spawn &lt;name&gt;."
+                        self.build_salamagotchi_memorial_response(
+                            chat_id,
+                            event.get(
+                                'memorial_text',
+                                f"💀 <b>{name}</b> has died of {event['death_reason']}. You can spawn a new Salamagotchi with /pet spawn &lt;name&gt;."
+                            ),
                         ),
-                        parse_mode='HTML'
                     )
                 elif event.get('stage_changed'):
                     self.send_bot_response(
@@ -1607,6 +1619,20 @@ class SeleniumArchiveBot:
                 fallback_text=self.salamagotchi_manager.get_status_message_text(chat_id, leading_message),
             )
 
+        if subcommand == "china":
+            self.salamagotchi_manager.add_command_log(chat_id, user_display, "china")
+            pet = self.salamagotchi_manager.get_pet(chat_id)
+            if not pet:
+                return "No Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
+            pet_name = html.escape(pet.get("name", "Salamagotchi"))
+            leading_message = f"{pet_name} is enthusiastically showing their support for China."
+            return self.build_salamagotchi_media_response(
+                chat_id,
+                leading_message=leading_message,
+                preferred_action="china_flag",
+                fallback_text=self.salamagotchi_manager.get_status_message_text(chat_id, leading_message),
+            )
+
         if subcommand == "school":
             school_args = subcommand_args.strip()
             if not school_args:
@@ -1719,7 +1745,10 @@ class SeleniumArchiveBot:
                 self.salamagotchi_manager.add_command_log(chat_id, user_display, f"{subcommand} {subcommand_args}".strip())
             if result.get('memorial_text'):
                 if subcommand == "memorial_preview":
-                    sent_message = self.send_message(chat_id, result['memorial_text'])
+                    sent_message = self.send_bot_response(
+                        chat_id,
+                        self.build_salamagotchi_memorial_response(chat_id, result['memorial_text']),
+                    )
                     if sent_message and isinstance(sent_message, dict):
                         preview_message_id = sent_message.get('message_id')
                         if preview_message_id:
@@ -1734,7 +1763,7 @@ class SeleniumArchiveBot:
                     else:
                         logger.warning(f"Memorial preview message could not be scheduled for deletion because send_message returned {type(sent_message).__name__}")
                     return None
-                return result['memorial_text']
+                return self.build_salamagotchi_memorial_response(chat_id, result['memorial_text'])
             if result.get('status_text'):
                 return self.build_salamagotchi_media_response(
                     chat_id,

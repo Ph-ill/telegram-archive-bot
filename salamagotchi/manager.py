@@ -1116,6 +1116,8 @@ class SalamagotchiManager:
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_usa_flag.webp"))
         elif action_name == "russia_flag":
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_russia_flag.webp"))
+        elif action_name == "china_flag":
+            candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_china_flag.webp"))
         else:
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_action_{action_name}.webp"))
 
@@ -1133,6 +1135,20 @@ class SalamagotchiManager:
         if os.path.exists(candidate_path):
             return candidate_path
         return None
+
+    def get_memorial_payload(self, chat_id: int, memorial_text: str) -> Optional[Dict[str, str]]:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return None
+
+        sticker_path = self._get_named_action_sticker_path("memorial")
+        if not sticker_path:
+            return None
+
+        return {
+            "sticker_path": sticker_path,
+            "text": memorial_text,
+        }
 
     def _get_stage_state_sticker_path(self, stage_name: str, state_name: str = "healthy") -> Optional[str]:
         stage_slug = STAGE_IMAGE_SLUGS.get(stage_name)
