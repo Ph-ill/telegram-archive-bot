@@ -822,8 +822,6 @@ class SalamagotchiManager:
         stage_name = html.escape(self._get_stage(pet.get("age_days", 0))["name"])
         tombstone = self._build_memorial_tombstone(pet.get("name", "Salamagotchi"))
         memories = "\n".join(self._build_memories_lines(pet))
-        command_log = pet.get("command_log", [])
-        max_memorial_command_lines = 12
         obituary_text = self._build_fallback_obituary_text(pet)
         if callable(self.memorial_writer):
             try:
@@ -832,23 +830,6 @@ class SalamagotchiManager:
                     obituary_text = written_obituary
             except Exception as e:
                 logger.warning("Failed to build memorial obituary text: %s", e)
-        command_section = ""
-        if command_log:
-            shown_entries = command_log[-max_memorial_command_lines:]
-            command_lines = [
-                self._format_command_entry_line(pet.get("name", "Salamagotchi"), entry)
-                for entry in shown_entries
-            ]
-            omitted_count = max(0, len(command_log) - len(shown_entries))
-            if omitted_count:
-                command_lines.insert(
-                    0,
-                    f"... {omitted_count} earlier command{'s' if omitted_count != 1 else ''} omitted ...",
-                )
-            command_section = (
-                "\n\n<b>Command History</b>\n"
-                f"<blockquote expandable>{chr(10).join(command_lines)}</blockquote>"
-            )
         return (
             f"💀 <b>{safe_name}</b> has died of {death_reason}.\n"
             f"<pre>{html.escape(tombstone)}</pre>\n"
@@ -857,7 +838,6 @@ class SalamagotchiManager:
             f"Stage: {stage_name}\n"
             f"{memories}\n\n"
             "A new Salamagotchi can be spawned with <code>/pet spawn &lt;name&gt;</code>.</blockquote>"
-            f"{command_section}"
         )
 
     def _build_need_phrase(self, pet: Dict[str, Any]) -> Optional[str]:
