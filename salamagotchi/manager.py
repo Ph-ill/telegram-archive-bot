@@ -820,7 +820,6 @@ class SalamagotchiManager:
         safe_name = html.escape(pet.get("name", "Salamagotchi"))
         death_reason = html.escape(pet.get("death_reason", "unknown causes"))
         stage_name = html.escape(self._get_stage(pet.get("age_days", 0))["name"])
-        tombstone = self._build_memorial_tombstone(pet.get("name", "Salamagotchi"))
         memories = "\n".join(self._build_memories_lines(pet))
         obituary_text = self._build_fallback_obituary_text(pet)
         if callable(self.memorial_writer):
@@ -832,7 +831,6 @@ class SalamagotchiManager:
                 logger.warning("Failed to build memorial obituary text: %s", e)
         return (
             f"💀 <b>{safe_name}</b> has died of {death_reason}.\n"
-            f"<pre>{html.escape(tombstone)}</pre>\n"
             f"<i>{html.escape(obituary_text)}</i>\n"
             f"<blockquote expandable><b>Memories of {safe_name}</b>\n"
             f"Stage: {stage_name}\n"
