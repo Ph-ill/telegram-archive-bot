@@ -440,6 +440,9 @@ class SalamagotchiManager:
             "speech_style_example": None,
             "speech_style_taught_by": None,
             "gender": None,
+            "spawn_pending": False,
+            "spawn_started_at": None,
+            "spawn_complete_at": None,
             "evolution_pending": False,
             "evolution_started_at": None,
             "evolution_complete_at": None,
@@ -466,6 +469,9 @@ class SalamagotchiManager:
         normalized.setdefault("speech_style_example", None)
         normalized.setdefault("speech_style_taught_by", None)
         normalized.setdefault("gender", None)
+        normalized.setdefault("spawn_pending", False)
+        normalized.setdefault("spawn_started_at", None)
+        normalized.setdefault("spawn_complete_at", None)
         normalized.setdefault("evolution_pending", False)
         normalized.setdefault("evolution_started_at", None)
         normalized.setdefault("evolution_complete_at", None)
@@ -775,6 +781,43 @@ class SalamagotchiManager:
         }
         announcement_text = announcement_map.get(str(pet["gender"]).lower(), "It's a baby!")
         return f"\n<b>{html.escape(announcement_text)}</b>"
+
+    def _build_spawn_start_text(self, pet_name: str, duration_seconds: int = 300) -> str:
+        safe_name = html.escape(pet_name or "Salamagotchi")
+        duration_text = self._format_duration_text(duration_seconds)
+        return (
+            "📦 <b>Your new Salamagotchi™ is on its way.</b>\n"
+            f"<blockquote expandable><b>{safe_name}</b> is being delivered now. It should arrive in about {html.escape(duration_text)}.</blockquote>"
+        )
+
+    def _build_spawn_arrival_text(self, pet_name: str) -> str:
+        safe_name = html.escape(pet_name or "Salamagotchi")
+        return (
+            f"🥚 <b>{safe_name}</b> has arrived and needs your help.\n"
+            f"<blockquote expandable>Feed {safe_name}, scoop poop, play with it, and wash it before neglect starts piling up.</blockquote>"
+        )
+
+    def _start_pending_spawn(
+        self,
+        pet: Dict[str, Any],
+        now: Optional[datetime] = None,
+        duration_seconds: int = 300,
+    ) -> Dict[str, Any]:
+        pet = self._normalize_pet(pet)
+        now = now or datetime.now(pytz.UTC)
+        if now.tzinfo is None:
+            now = pytz.UTC.localize(now)
+        pet["spawn_pending"] = True
+        pet["spawn_started_at"] = now.isoformat()
+        pet["spawn_complete_at"] = (now + timedelta(seconds=duration_seconds)).isoformat()
+        return pet
+
+    def _clear_pending_spawn(self, pet: Dict[str, Any]) -> Dict[str, Any]:
+        pet = self._normalize_pet(pet)
+        pet["spawn_pending"] = False
+        pet["spawn_started_at"] = None
+        pet["spawn_complete_at"] = None
+        return pet
 
     def _build_evolution_start_text(self, pet: Dict[str, Any], duration_seconds: int = 3600) -> str:
         safe_name = html.escape(pet.get("name", "Salamagotchi"))
@@ -1136,6 +1179,71 @@ class SalamagotchiManager:
             "text": memorial_text,
         }
 
+    def get_spawn_start_payload(self, chat_id: int, duration_seconds: int = 300) -> Optional[Dict[str, str]]:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return None
+
+        sticker_path = self._get_named_action_sticker_path("spawn")
+        if not sticker_path:
+            return None
+
+        return {
+            "sticker_path": sticker_path,
+            "text": self._build_spawn_start_text(pet.get("name", "Salamagotchi"), duration_seconds=duration_seconds),
+        }
+
+    def get_spawn_start_preview_payload(self, pet_name: str, duration_seconds: int = 30) -> Optional[Dict[str, str]]:
+        sticker_path = self._get_named_action_sticker_path("spawn")
+        if not sticker_path:
+            return None
+
+        return {
+            "sticker_path": sticker_path,
+            "text": self._build_spawn_start_text(pet_name, duration_seconds=duration_seconds),
+        }
+
+    def get_spawn_arrival_payload(self, chat_id: int) -> Optional[Dict[str, str]]:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return None
+
+        sticker_path = self._get_stage_state_sticker_path("Eggling", "hungry_poopy_dirty_restless")
+        if not sticker_path:
+            return None
+
+        return {
+            "sticker_path": sticker_path,
+            "text": self._build_spawn_arrival_text(pet.get("name", "Salamagotchi")),
+        }
+
+    def get_spawn_arrival_preview_payload(self, pet_name: str) -> Optional[Dict[str, str]]:
+        sticker_path = self._get_stage_state_sticker_path("Eggling", "hungry_poopy_dirty_restless")
+        if not sticker_path:
+            return None
+
+        return {
+            "sticker_path": sticker_path,
+            "text": self._build_spawn_arrival_text(pet_name),
+        }
+
+    def get_spawn_status(self, chat_id: int, now: Optional[datetime] = None) -> Optional[Dict[str, Any]]:
+        pet = self.get_pet(chat_id)
+        if not pet or not pet.get("alive", False) or not pet.get("spawn_pending"):
+            return None
+
+        now = now or datetime.now(pytz.UTC)
+        if now.tzinfo is None:
+            now = pytz.UTC.localize(now)
+
+        complete_at = self._parse_iso_datetime(pet.get("spawn_complete_at"))
+        is_ready = complete_at is not None and now >= complete_at
+        return {
+            "pet": pet,
+            "ready": is_ready,
+            "complete_at": complete_at,
+        }
+
     def _get_stage_state_sticker_path(self, stage_name: str, state_name: str = "healthy") -> Optional[str]:
         stage_slug = STAGE_IMAGE_SLUGS.get(stage_name)
         if not stage_slug:
@@ -1288,6 +1396,8 @@ class SalamagotchiManager:
             for chat_id, pet in data.items():
                 if not pet.get("alive", False):
                     continue
+                if pet.get("spawn_pending"):
+                    continue
                 if pet.get("last_rollover_date") == current_date:
                     continue
 
@@ -1421,6 +1531,92 @@ class SalamagotchiManager:
                 )
         return pending
 
+    def complete_ready_spawn(self, chat_id: int, now: Optional[datetime] = None) -> Optional[Dict[str, Any]]:
+        now = now or datetime.now(pytz.UTC)
+        if now.tzinfo is None:
+            now = pytz.UTC.localize(now)
+
+        with self.lock:
+            data = self._read_data()
+            pet = self._normalize_pet(data.get(str(chat_id)))
+            if not pet or not pet.get("alive", False) or not pet.get("spawn_pending"):
+                return None
+
+            complete_at = self._parse_iso_datetime(pet.get("spawn_complete_at"))
+            if complete_at and now < complete_at:
+                return None
+
+            pet = self._clear_pending_spawn(pet)
+            data[str(chat_id)] = pet
+            self._write_data(data)
+            return {
+                "chat_id": int(chat_id),
+                "name": pet.get("name", "Salamagotchi"),
+            }
+
+    def process_completed_spawns(self, now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+        now = now or datetime.now(pytz.UTC)
+        if now.tzinfo is None:
+            now = pytz.UTC.localize(now)
+
+        events: List[Dict[str, Any]] = []
+        with self.lock:
+            data = self._read_data()
+            changed = False
+
+            for chat_id, pet in data.items():
+                pet = self._normalize_pet(pet)
+                if not pet or not pet.get("alive", False) or not pet.get("spawn_pending"):
+                    continue
+
+                complete_at = self._parse_iso_datetime(pet.get("spawn_complete_at"))
+                if complete_at and now < complete_at:
+                    continue
+
+                pet = self._clear_pending_spawn(pet)
+                data[chat_id] = pet
+                changed = True
+                events.append(
+                    {
+                        "chat_id": int(chat_id),
+                        "name": pet.get("name", "Salamagotchi"),
+                    }
+                )
+
+            if changed:
+                self._write_data(data)
+
+        return events
+
+    def get_pending_spawns(self, now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+        now = now or datetime.now(pytz.UTC)
+        if now.tzinfo is None:
+            now = pytz.UTC.localize(now)
+
+        pending: List[Dict[str, Any]] = []
+        with self.lock:
+            data = self._read_data()
+            for chat_id, pet in data.items():
+                pet = self._normalize_pet(pet)
+                if not pet or not pet.get("alive", False) or not pet.get("spawn_pending"):
+                    continue
+
+                complete_at = self._parse_iso_datetime(pet.get("spawn_complete_at"))
+                if complete_at:
+                    remaining_seconds = max(0, int((complete_at - now).total_seconds()))
+                else:
+                    remaining_seconds = 0
+
+                pending.append(
+                    {
+                        "chat_id": int(chat_id),
+                        "remaining_seconds": remaining_seconds,
+                        "name": pet.get("name", "Salamagotchi"),
+                    }
+                )
+
+        return pending
+
     def spawn(self, chat_id: int, name: str, user_display: str, now: Optional[datetime] = None) -> Dict[str, Any]:
         now = now or datetime.now(pytz.UTC)
         cleaned_name = " ".join(name.split()).strip()
@@ -1439,6 +1635,7 @@ class SalamagotchiManager:
                 }
 
             pet = self._default_state(cleaned_name, user_display, now)
+            pet = self._start_pending_spawn(pet, now=now, duration_seconds=300)
             if existing:
                 pet["graveyard"] = existing.get("graveyard", [])
             data[str(chat_id)] = pet
@@ -1446,8 +1643,9 @@ class SalamagotchiManager:
 
         return {
             "success": True,
-            "message": f"🦎 <b>{html.escape(cleaned_name)}</b> has spawned! Keep it fed, clean, entertained, and washed every day.",
-            "status_text": self._format_status_text(pet),
+            "message": self._build_spawn_start_text(cleaned_name, duration_seconds=300),
+            "spawn_pending": True,
+            "spawn_duration_seconds": 300,
         }
 
     def get_pet(self, chat_id: int) -> Optional[Dict[str, Any]]:
@@ -1460,6 +1658,8 @@ class SalamagotchiManager:
         pet = self.get_pet(chat_id)
         if not pet:
             return "No Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
+        if pet.get("spawn_pending"):
+            return self._build_spawn_start_text(pet.get("name", "Salamagotchi"), duration_seconds=300)
         return self._format_status_text(pet)
 
     def get_status_message_text(self, chat_id: int, leading_message: Optional[str] = None) -> str:
@@ -1468,6 +1668,8 @@ class SalamagotchiManager:
             if leading_message:
                 return f"{leading_message}\n\nNo Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
             return "No Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
+        if pet.get("spawn_pending"):
+            return self._build_spawn_start_text(pet.get("name", "Salamagotchi"), duration_seconds=300)
         return self._format_status_message_text(pet, leading_message)
 
     def get_compact_status_text(self, chat_id: int) -> str:
@@ -2093,7 +2295,7 @@ class SalamagotchiManager:
             f"<code>{command_prefix} commands</code> - Show the custom command history\n"
             f"<code>{command_prefix} teach_speak</code> - Teach the pet a custom speaking style by replying to its prompt\n"
             f"<code>{command_prefix} evolve_in</code> - Show how long remains until the next evolution\n"
-            f"<code>{command_prefix} spawn &lt;name&gt;</code> - Spawn a new shared Salamagotchi\n"
+            f"<code>{command_prefix} spawn &lt;name&gt;</code> - Order a new shared Salamagotchi that arrives in 5 minutes\n"
             f"<code>{command_prefix} feed</code> - Feed it (1 time per day)\n"
             f"<code>{command_prefix} scoop</code> - Scoop poop (1 time per day)\n"
             f"<code>{command_prefix} play</code> - Play with it (1 time per day)\n"
@@ -2116,11 +2318,13 @@ class SalamagotchiManager:
             f"<code>{command_prefix} memorial_preview</code> - Preview the memorial sticker and obituary for 30 seconds\n\n"
             f"<code>{command_prefix} evolution_preview [stage]</code> - Preview a stage evolution announcement\n\n"
             f"<code>{command_prefix} evolution_test</code> - Preview the timed evolution lock and completion flow with a 30-second delay\n\n"
+            f"<code>{command_prefix} spawn_test [name]</code> - Preview the delayed spawn flow with a 30-second delay, without storing data\n\n"
             f"<code>{command_prefix} stage_art</code> - Preview the ASCII art for every life stage\n\n"
             f"<code>{command_prefix} graveyard_remove_last</code> - Remove the newest graveyard entry\n\n"
             "<b>Rules</b>\n"
             "• One shared Salamagotchi per chat\n"
             "• You cannot spawn a new one while the current one is alive\n"
+            "• A newly spawned pet spends 5 minutes on the way before it arrives as an eggling\n"
             "• Each need can be missed for one day only\n"
             "• Miss the same need two days in a row and it dies\n"
             "• Every day it survives, it grows older and may change stage\n"

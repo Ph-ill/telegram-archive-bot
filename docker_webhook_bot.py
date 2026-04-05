@@ -81,6 +81,8 @@ class SeleniumArchiveBot:
         self.salamagotchi_manager.speech_styler = self.style_pet_speech_line
         self.salamagotchi_manager.memorial_writer = self.write_pet_memorial_obituary
         self.pending_speech_teach = {}
+        self.pending_spawn_timers = {}
+        self.pending_spawn_test_timers = {}
         self.pending_evolution_timers = {}
         self.pending_evolution_test_timers = {}
         
@@ -97,6 +99,7 @@ class SeleniumArchiveBot:
         # Start birthday monitoring system
         self.start_birthday_monitor()
         self.start_salamagotchi_monitor()
+        self.schedule_existing_salamagotchi_spawns()
         self.schedule_existing_salamagotchi_evolutions()
         
         # Initialize quiz manager if API key is available
@@ -754,7 +757,7 @@ class SeleniumArchiveBot:
         help_text += f"• /pet{bot_mention} commands - Show custom commands sent to the pet\n"
         help_text += f"• /pet{bot_mention} teach_speak - Teach the pet a new speaking style by replying to its prompt\n"
         help_text += f"• /pet{bot_mention} evolve_in - Show how long remains until the next evolution\n"
-        help_text += f"• /pet{bot_mention} spawn &lt;name&gt; - Spawn a shared Salamagotchi\n"
+        help_text += f"• /pet{bot_mention} spawn &lt;name&gt; - Order a new shared Salamagotchi (arrives in 5 minutes)\n"
         help_text += f"• /pet{bot_mention} feed - Feed the Salamagotchi (1 time per day)\n"
         help_text += f"• /pet{bot_mention} scoop - Scoop poop (1 time per day)\n"
         help_text += f"• /pet{bot_mention} play - Play with the Salamagotchi (1 time per day)\n"
@@ -795,6 +798,7 @@ class SeleniumArchiveBot:
             help_text += f"• /pet{bot_mention} memorial_preview - Preview the memorial sticker and obituary for 30 seconds\n"
             help_text += f"• /pet{bot_mention} evolution_preview [stage] - Preview a stage evolution announcement\n"
             help_text += f"• /pet{bot_mention} evolution_test - Preview the timed evolution lock and completion flow (30 seconds)\n"
+            help_text += f"• /pet{bot_mention} spawn_test [name] - Preview the delayed spawn flow (30 seconds, cosmetic only)\n"
             help_text += f"• /pet{bot_mention} stage_art - Preview the ASCII art for every life stage\n"
             help_text += f"• /pet{bot_mention} graveyard_remove_last - Remove the newest graveyard entry\n"
             help_text += f"• /test_birthday{bot_mention} - Send test birthday message\n"
@@ -888,6 +892,133 @@ class SeleniumArchiveBot:
                 logger.info("Rescheduled %s pending Salamagotchi evolution timer(s)", len(pending))
         except Exception as e:
             logger.error(f"Failed to reschedule pending Salamagotchi evolutions: {e}")
+
+    def schedule_existing_salamagotchi_spawns(self):
+        """Reschedule any pending pet deliveries after a restart."""
+        try:
+            pending = self.salamagotchi_manager.get_pending_spawns()
+            for entry in pending:
+                self.schedule_salamagotchi_spawn_completion(
+                    entry["chat_id"],
+                    entry["remaining_seconds"],
+                )
+            if pending:
+                logger.info("Rescheduled %s pending Salamagotchi spawn timer(s)", len(pending))
+        except Exception as e:
+            logger.error(f"Failed to reschedule pending Salamagotchi spawns: {e}")
+
+    def get_salamagotchi_spawn_start_response(self, chat_id, duration_seconds=300):
+        payload = self.salamagotchi_manager.get_spawn_start_payload(chat_id, duration_seconds=duration_seconds)
+        if payload:
+            return {
+                "type": "sticker",
+                "sticker_path": payload["sticker_path"],
+                "text": payload["text"],
+            }
+        pet = self.salamagotchi_manager.get_pet(chat_id)
+        pet_name = html.escape(pet.get("name", "Salamagotchi")) if pet else "Salamagotchi"
+        duration_text = self.salamagotchi_manager._format_duration_text(duration_seconds)
+        return f"📦 <b>Your new Salamagotchi™ is on its way.</b>\n<blockquote expandable><b>{pet_name}</b> should arrive in about {duration_text}.</blockquote>"
+
+    def get_salamagotchi_spawn_start_preview_response(self, pet_name, duration_seconds=30):
+        payload = self.salamagotchi_manager.get_spawn_start_preview_payload(pet_name, duration_seconds=duration_seconds)
+        if payload:
+            return {
+                "type": "sticker",
+                "sticker_path": payload["sticker_path"],
+                "text": payload["text"],
+            }
+        duration_text = self.salamagotchi_manager._format_duration_text(duration_seconds)
+        return f"📦 <b>Your new Salamagotchi™ is on its way.</b>\n<blockquote expandable><b>{html.escape(pet_name)}</b> should arrive in about {duration_text}.</blockquote>"
+
+    def get_salamagotchi_spawn_arrival_response(self, chat_id):
+        payload = self.salamagotchi_manager.get_spawn_arrival_payload(chat_id)
+        if payload:
+            return {
+                "type": "sticker",
+                "sticker_path": payload["sticker_path"],
+                "text": payload["text"],
+            }
+        pet = self.salamagotchi_manager.get_pet(chat_id)
+        if not pet:
+            return None
+        pet_name = html.escape(pet.get("name", "Salamagotchi"))
+        return f"🥚 <b>{pet_name}</b> has arrived and needs your help."
+
+    def get_salamagotchi_spawn_arrival_preview_response(self, pet_name):
+        payload = self.salamagotchi_manager.get_spawn_arrival_preview_payload(pet_name)
+        if payload:
+            return {
+                "type": "sticker",
+                "sticker_path": payload["sticker_path"],
+                "text": payload["text"],
+            }
+        return f"🥚 <b>{html.escape(pet_name)}</b> has arrived and needs your help."
+
+    def schedule_salamagotchi_spawn_completion(self, chat_id, delay_seconds):
+        """Schedule the delayed pet arrival announcement."""
+        existing_timer = self.pending_spawn_timers.pop(chat_id, None)
+        if existing_timer:
+            existing_timer.cancel()
+
+        timer = threading.Timer(
+            max(0, delay_seconds),
+            self.send_salamagotchi_spawn_completion,
+            args=(chat_id,),
+        )
+        timer.daemon = True
+        self.pending_spawn_timers[chat_id] = timer
+        timer.start()
+        logger.info(
+            "Scheduled Salamagotchi spawn completion for chat %s in %s seconds",
+            chat_id,
+            max(0, delay_seconds),
+        )
+
+    def send_salamagotchi_spawn_completion(self, chat_id):
+        """Finalize a pending spawn and announce the eggling arrival."""
+        self.pending_spawn_timers.pop(chat_id, None)
+        try:
+            completed = self.salamagotchi_manager.complete_ready_spawn(chat_id)
+            if not completed:
+                logger.info("No ready Salamagotchi spawn to complete for chat %s", chat_id)
+                return
+
+            response = self.get_salamagotchi_spawn_arrival_response(chat_id)
+            if response:
+                self.send_bot_response(chat_id, response)
+        except Exception as e:
+            logger.error(f"Failed to send Salamagotchi spawn completion for chat {chat_id}: {e}")
+
+    def schedule_salamagotchi_spawn_test_completion(self, chat_id, pet_name, delay_seconds=30):
+        """Schedule the cosmetic admin spawn preview completion."""
+        existing_timer = self.pending_spawn_test_timers.pop(chat_id, None)
+        if existing_timer:
+            existing_timer.cancel()
+
+        timer = threading.Timer(
+            max(0, delay_seconds),
+            self.send_salamagotchi_spawn_test_completion,
+            args=(chat_id, pet_name),
+        )
+        timer.daemon = True
+        self.pending_spawn_test_timers[chat_id] = timer
+        timer.start()
+        logger.info(
+            "Scheduled Salamagotchi spawn test completion for chat %s in %s seconds",
+            chat_id,
+            max(0, delay_seconds),
+        )
+
+    def send_salamagotchi_spawn_test_completion(self, chat_id, pet_name):
+        """Send the delayed second half of the cosmetic spawn preview."""
+        self.pending_spawn_test_timers.pop(chat_id, None)
+        try:
+            response = self.get_salamagotchi_spawn_arrival_preview_response(pet_name)
+            if response:
+                self.send_bot_response(chat_id, response)
+        except Exception as e:
+            logger.error(f"Failed to send Salamagotchi spawn test completion for chat {chat_id}: {e}")
 
     def get_salamagotchi_evolution_start_response(self, chat_id, duration_seconds=3600):
         payload = self.salamagotchi_manager.get_evolution_start_payload(chat_id, duration_seconds=duration_seconds)
@@ -1002,6 +1133,12 @@ class SeleniumArchiveBot:
     def check_and_update_salamagotchis(self):
         """Process Salamagotchi daily rollovers and notify chats on death or stage change."""
         try:
+            completed_spawns = self.salamagotchi_manager.process_completed_spawns()
+            for event in completed_spawns:
+                response = self.get_salamagotchi_spawn_arrival_response(event["chat_id"])
+                if response:
+                    self.send_bot_response(event["chat_id"], response)
+
             completed_evolutions = self.salamagotchi_manager.process_completed_evolutions()
             for event in completed_evolutions:
                 response = self.get_salamagotchi_evolution_complete_response(event["chat_id"])
@@ -1545,8 +1682,31 @@ class SeleniumArchiveBot:
             if result.get('success'):
                 self.salamagotchi_manager.add_command_log(chat_id, user_display, f"spawn {subcommand_args}")
             if result['success']:
-                return self.build_salamagotchi_media_response(chat_id, result['message'], preferred_action="spawn")
+                self.schedule_salamagotchi_spawn_completion(
+                    chat_id,
+                    result.get("spawn_duration_seconds", 300),
+                )
+                return self.get_salamagotchi_spawn_start_response(
+                    chat_id,
+                    duration_seconds=result.get("spawn_duration_seconds", 300),
+                )
             return result['message']
+
+        spawn_status = self.salamagotchi_manager.get_spawn_status(chat_id)
+        if spawn_status:
+            if spawn_status.get("ready"):
+                self.salamagotchi_manager.complete_ready_spawn(chat_id)
+                return self.get_salamagotchi_spawn_arrival_response(chat_id)
+
+            allow_spawn_test_bypass = subcommand == "spawn_test" and sender_username.lower() in special_users
+            if not allow_spawn_test_bypass:
+                complete_at = spawn_status.get("complete_at")
+                if complete_at:
+                    now_utc = datetime.now(pytz.UTC)
+                    remaining_seconds = max(0, int((complete_at - now_utc).total_seconds()))
+                else:
+                    remaining_seconds = 300
+                return self.get_salamagotchi_spawn_start_response(chat_id, duration_seconds=remaining_seconds)
 
         evolution_status = self.salamagotchi_manager.get_evolution_status(chat_id)
         if evolution_status:
@@ -1554,7 +1714,7 @@ class SeleniumArchiveBot:
                 self.salamagotchi_manager.complete_ready_evolution(chat_id)
                 return self.get_salamagotchi_evolution_complete_response(chat_id)
 
-            allow_test_bypass = subcommand == "evolution_test" and sender_username.lower() in special_users
+            allow_test_bypass = subcommand in {"evolution_test", "spawn_test"} and sender_username.lower() in special_users
             if not allow_test_bypass:
                 return self.get_salamagotchi_evolution_start_response(chat_id, duration_seconds=3600)
 
@@ -1705,7 +1865,7 @@ class SeleniumArchiveBot:
                 )
             return result['message']
 
-        if subcommand in {"reset", "rename", "kill", "graveyard_remove_last", "memorial_preview", "stage_art", "evolution_preview", "evolution_test"}:
+        if subcommand in {"reset", "rename", "kill", "graveyard_remove_last", "memorial_preview", "stage_art", "evolution_preview", "evolution_test", "spawn_test"}:
             if sender_username.lower() not in special_users:
                 return "This Salamagotchi command is only available to administrators."
 
@@ -1738,6 +1898,13 @@ class SeleniumArchiveBot:
                 self.salamagotchi_manager.add_command_log(chat_id, user_display, "evolution_test")
                 self.schedule_salamagotchi_evolution_test_completion(chat_id, next_stage, delay_seconds=30)
                 return self.get_salamagotchi_evolution_start_response(chat_id, duration_seconds=30)
+            elif subcommand == "spawn_test":
+                preview_name = " ".join(subcommand_args.split()).strip()
+                if not preview_name:
+                    current_pet = self.salamagotchi_manager.get_pet(chat_id)
+                    preview_name = current_pet.get("name", "Salamagotchi") if current_pet else "Salamagotchi"
+                self.schedule_salamagotchi_spawn_test_completion(chat_id, preview_name, delay_seconds=30)
+                return self.get_salamagotchi_spawn_start_preview_response(preview_name, duration_seconds=30)
             elif subcommand == "stage_art":
                 self.salamagotchi_manager.add_command_log(chat_id, user_display, "stage_art")
                 return self.salamagotchi_manager.get_stage_art_preview_text()
