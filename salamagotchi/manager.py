@@ -440,6 +440,10 @@ class SalamagotchiManager:
             "speech_style_example": None,
             "speech_style_taught_by": None,
             "gender": None,
+            "evolution_pending": False,
+            "evolution_started_at": None,
+            "evolution_complete_at": None,
+            "evolution_target_stage": None,
         }
 
     def _normalize_pet(self, pet: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -462,6 +466,10 @@ class SalamagotchiManager:
         normalized.setdefault("speech_style_example", None)
         normalized.setdefault("speech_style_taught_by", None)
         normalized.setdefault("gender", None)
+        normalized.setdefault("evolution_pending", False)
+        normalized.setdefault("evolution_started_at", None)
+        normalized.setdefault("evolution_complete_at", None)
+        normalized.setdefault("evolution_target_stage", None)
         return normalized
 
     def _format_date(self, iso_value: Optional[str]) -> str:
@@ -735,6 +743,78 @@ class SalamagotchiManager:
             f"<pre>{html.escape(self._render_stage_art(preview_pet, stage))}</pre>\n"
             f"<blockquote expandable>{html.escape(flavor)}{gender_line}</blockquote>"
         )
+
+    def _parse_iso_datetime(self, iso_value: Optional[str]) -> Optional[datetime]:
+        if not iso_value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(iso_value)
+            if parsed.tzinfo is None:
+                return pytz.UTC.localize(parsed)
+            return parsed.astimezone(pytz.UTC)
+        except Exception:
+            return None
+
+    def _format_duration_text(self, total_seconds: int) -> str:
+        total_seconds = max(0, int(total_seconds))
+        if total_seconds % 3600 == 0 and total_seconds >= 3600:
+            hours = total_seconds // 3600
+            return f"{hours} hour{'s' if hours != 1 else ''}"
+        if total_seconds % 60 == 0 and total_seconds >= 60:
+            minutes = total_seconds // 60
+            return f"{minutes} minute{'s' if minutes != 1 else ''}"
+        return f"{total_seconds} second{'s' if total_seconds != 1 else ''}"
+
+    def _build_baby_gender_line(self, pet: Dict[str, Any], stage_name: str) -> str:
+        if stage_name != "Baby" or not pet.get("gender"):
+            return ""
+        announcement_map = {
+            "male": "It's a baby boy!",
+            "female": "It's a baby girl!",
+            "intersex": "It's an intersex baby!",
+        }
+        announcement_text = announcement_map.get(str(pet["gender"]).lower(), "It's a baby!")
+        return f"\n<b>{html.escape(announcement_text)}</b>"
+
+    def _build_evolution_start_text(self, pet: Dict[str, Any], duration_seconds: int = 3600) -> str:
+        safe_name = html.escape(pet.get("name", "Salamagotchi"))
+        duration_text = self._format_duration_text(duration_seconds)
+        return (
+            f"🌀 <b>{safe_name}</b> is evolving!\n"
+            f"<blockquote expandable>{safe_name} is in the middle of a transformation and cannot be interacted with for {html.escape(duration_text)}.</blockquote>"
+        )
+
+    def _build_evolution_complete_text(self, pet: Dict[str, Any], stage_name: str) -> str:
+        safe_name = html.escape(pet.get("name", "Salamagotchi"))
+        gender_line = self._build_baby_gender_line(pet, stage_name)
+        return (
+            f"✨ <b>{safe_name}</b> has evolved successfully and is now a <b>{html.escape(stage_name)}</b>.{gender_line}"
+        )
+
+    def _start_pending_evolution(
+        self,
+        pet: Dict[str, Any],
+        target_stage: str,
+        now: Optional[datetime] = None,
+        duration_seconds: int = 3600,
+    ) -> Dict[str, Any]:
+        pet = self._normalize_pet(pet)
+        now = now or datetime.now(pytz.UTC)
+        if now.tzinfo is None:
+            now = pytz.UTC.localize(now)
+        pet["evolution_pending"] = True
+        pet["evolution_started_at"] = now.isoformat()
+        pet["evolution_complete_at"] = (now + timedelta(seconds=duration_seconds)).isoformat()
+        pet["evolution_target_stage"] = target_stage
+        return pet
+
+    def _clear_pending_evolution(self, pet: Dict[str, Any]) -> Dict[str, Any]:
+        pet = self._normalize_pet(pet)
+        pet["evolution_pending"] = False
+        pet["evolution_started_at"] = None
+        pet["evolution_complete_at"] = None
+        pet["evolution_target_stage"] = None
+        return pet
 
     def build_death_memorial_text(self, pet: Dict[str, Any]) -> str:
         safe_name = html.escape(pet.get("name", "Salamagotchi"))
@@ -1044,6 +1124,23 @@ class SalamagotchiManager:
                 return candidate_path
         return None
 
+    def _get_named_action_sticker_path(self, action_name: Optional[str]) -> Optional[str]:
+        if not action_name:
+            return None
+        candidate_path = os.path.join(self.sticker_dir, f"action_{action_name}.webp")
+        if os.path.exists(candidate_path):
+            return candidate_path
+        return None
+
+    def _get_stage_state_sticker_path(self, stage_name: str, state_name: str = "healthy") -> Optional[str]:
+        stage_slug = STAGE_IMAGE_SLUGS.get(stage_name)
+        if not stage_slug:
+            return None
+        candidate_path = os.path.join(self.sticker_dir, f"{stage_slug}_{state_name}.webp")
+        if os.path.exists(candidate_path):
+            return candidate_path
+        return None
+
     def get_status_photo_payload(
         self,
         chat_id: int,
@@ -1061,6 +1158,75 @@ class SalamagotchiManager:
         return {
             "sticker_path": sticker_path,
             "text": self._format_status_message_text(pet, leading_message),
+        }
+
+    def get_evolution_start_payload(
+        self,
+        chat_id: int,
+        duration_seconds: int = 3600,
+    ) -> Optional[Dict[str, str]]:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return None
+
+        sticker_path = self._get_named_action_sticker_path("evolve")
+        if not sticker_path:
+            return None
+
+        return {
+            "sticker_path": sticker_path,
+            "text": self._build_evolution_start_text(pet, duration_seconds=duration_seconds),
+        }
+
+    def get_evolution_complete_payload(self, chat_id: int) -> Optional[Dict[str, str]]:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return None
+
+        stage_name = pet.get("evolution_target_stage") or self._get_stage(pet.get("age_days", 0))["name"]
+        sticker_path = self._get_stage_state_sticker_path(stage_name, "healthy")
+        if not sticker_path:
+            return None
+
+        return {
+            "sticker_path": sticker_path,
+            "text": self._build_evolution_complete_text(pet, stage_name),
+        }
+
+    def get_stage_completion_preview_payload(self, chat_id: int, stage_name: str) -> Optional[Dict[str, str]]:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return None
+
+        preview_pet = deepcopy(pet)
+        if stage_name == "Baby" and not preview_pet.get("gender"):
+            preview_pet["gender"] = self._assign_gender()
+
+        sticker_path = self._get_stage_state_sticker_path(stage_name, "healthy")
+        if not sticker_path:
+            return None
+
+        return {
+            "sticker_path": sticker_path,
+            "text": self._build_evolution_complete_text(preview_pet, stage_name),
+        }
+
+    def get_evolution_status(self, chat_id: int, now: Optional[datetime] = None) -> Optional[Dict[str, Any]]:
+        pet = self.get_pet(chat_id)
+        if not pet or not pet.get("alive", False) or not pet.get("evolution_pending"):
+            return None
+
+        now = now or datetime.now(pytz.UTC)
+        if now.tzinfo is None:
+            now = pytz.UTC.localize(now)
+
+        complete_at = self._parse_iso_datetime(pet.get("evolution_complete_at"))
+        is_ready = complete_at is not None and now >= complete_at
+        return {
+            "pet": pet,
+            "ready": is_ready,
+            "target_stage": pet.get("evolution_target_stage") or self._get_stage(pet.get("age_days", 0))["name"],
+            "complete_at": complete_at,
         }
 
     def _apply_rollover(self, pet: Dict[str, Any], current_date: str) -> Tuple[Dict[str, Any], bool]:
@@ -1149,13 +1315,107 @@ class SalamagotchiManager:
                 if not updated_pet.get("alive", False):
                     event["memorial_text"] = self.build_death_memorial_text(updated_pet)
                 elif stage_changed:
-                    event["evolution_text"] = self.build_stage_evolution_text(updated_pet, event["stage"])
+                    updated_pet = self._start_pending_evolution(updated_pet, event["stage"], now=now, duration_seconds=3600)
+                    data[chat_id] = updated_pet
+                    event["evolution_pending"] = True
+                    event["evolution_duration_seconds"] = 3600
                 events.append(event)
 
             if changed:
                 self._write_data(data)
 
         return events
+
+    def complete_ready_evolution(self, chat_id: int, now: Optional[datetime] = None) -> Optional[Dict[str, Any]]:
+        now = now or datetime.now(pytz.UTC)
+        if now.tzinfo is None:
+            now = pytz.UTC.localize(now)
+
+        with self.lock:
+            data = self._read_data()
+            pet = self._normalize_pet(data.get(str(chat_id)))
+            if not pet or not pet.get("alive", False) or not pet.get("evolution_pending"):
+                return None
+
+            complete_at = self._parse_iso_datetime(pet.get("evolution_complete_at"))
+            if complete_at and now < complete_at:
+                return None
+
+            target_stage = pet.get("evolution_target_stage") or self._get_stage(pet.get("age_days", 0))["name"]
+            result = {
+                "chat_id": int(chat_id),
+                "name": pet.get("name", "Salamagotchi"),
+                "stage": target_stage,
+            }
+
+            pet = self._clear_pending_evolution(pet)
+            data[str(chat_id)] = pet
+            self._write_data(data)
+            return result
+
+    def process_completed_evolutions(self, now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+        now = now or datetime.now(pytz.UTC)
+        if now.tzinfo is None:
+            now = pytz.UTC.localize(now)
+
+        events: List[Dict[str, Any]] = []
+        with self.lock:
+            data = self._read_data()
+            changed = False
+
+            for chat_id, pet in data.items():
+                pet = self._normalize_pet(pet)
+                if not pet or not pet.get("alive", False) or not pet.get("evolution_pending"):
+                    continue
+
+                complete_at = self._parse_iso_datetime(pet.get("evolution_complete_at"))
+                if complete_at and now < complete_at:
+                    continue
+
+                target_stage = pet.get("evolution_target_stage") or self._get_stage(pet.get("age_days", 0))["name"]
+                pet = self._clear_pending_evolution(pet)
+                data[chat_id] = pet
+                changed = True
+                events.append(
+                    {
+                        "chat_id": int(chat_id),
+                        "name": pet.get("name", "Salamagotchi"),
+                        "stage": target_stage,
+                    }
+                )
+
+            if changed:
+                self._write_data(data)
+
+        return events
+
+    def get_pending_evolutions(self, now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+        now = now or datetime.now(pytz.UTC)
+        if now.tzinfo is None:
+            now = pytz.UTC.localize(now)
+
+        pending: List[Dict[str, Any]] = []
+        with self.lock:
+            data = self._read_data()
+            for chat_id, pet in data.items():
+                pet = self._normalize_pet(pet)
+                if not pet or not pet.get("alive", False) or not pet.get("evolution_pending"):
+                    continue
+
+                complete_at = self._parse_iso_datetime(pet.get("evolution_complete_at"))
+                if complete_at:
+                    remaining_seconds = max(0, int((complete_at - now).total_seconds()))
+                else:
+                    remaining_seconds = 0
+
+                pending.append(
+                    {
+                        "chat_id": int(chat_id),
+                        "remaining_seconds": remaining_seconds,
+                        "target_stage": pet.get("evolution_target_stage") or self._get_stage(pet.get("age_days", 0))["name"],
+                    }
+                )
+        return pending
 
     def spawn(self, chat_id: int, name: str, user_display: str, now: Optional[datetime] = None) -> Dict[str, Any]:
         now = now or datetime.now(pytz.UTC)
@@ -1740,6 +2000,17 @@ class SalamagotchiManager:
             f"<b>Time Remaining:</b> {remaining_text}</blockquote>"
         )
 
+    def get_next_stage_name(self, chat_id: int) -> Optional[str]:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return None
+
+        current_age = pet.get("age_days", 0)
+        next_stage = next((stage for stage in STAGES if stage["min_age"] > current_age), None)
+        if not next_stage:
+            return None
+        return next_stage["name"]
+
     def get_graveyard_text(self, chat_id: int) -> str:
         pet = self.get_pet(chat_id)
         if not pet or not pet.get("graveyard"):
@@ -1836,6 +2107,7 @@ class SalamagotchiManager:
             f"<code>{command_prefix} kill</code> - Forcibly kill the current pet\n\n"
             f"<code>{command_prefix} memorial_preview</code> - Preview the death memorial without killing it\n\n"
             f"<code>{command_prefix} evolution_preview [stage]</code> - Preview a stage evolution announcement\n\n"
+            f"<code>{command_prefix} evolution_test</code> - Preview the timed evolution flow with a 30-second delay\n\n"
             f"<code>{command_prefix} stage_art</code> - Preview the ASCII art for every life stage\n\n"
             f"<code>{command_prefix} graveyard_remove_last</code> - Remove the newest graveyard entry\n\n"
             "<b>Rules</b>\n"
