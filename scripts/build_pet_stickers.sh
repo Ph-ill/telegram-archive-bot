@@ -19,8 +19,12 @@ for image_path in "${SOURCE_DIR}"/*.png; do
   base_name="$(basename "${image_path}" .png)"
   output_path="${OUTPUT_DIR}/${base_name}.webp"
   magick "${image_path}" \
-    -bordercolor none \
-    -border 1x1 \
+    -alpha set \
+    -channel A \
+    -threshold 1% \
+    +channel \
+    -background none \
+    -alpha background \
     -trim +repage \
     -resize "${INNER_SIZE}x${INNER_SIZE}" \
     -background none \

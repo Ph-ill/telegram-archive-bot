@@ -25,8 +25,12 @@ for image_path in "${SOURCE_DIR}"/*.png; do
   output_path="${OUTPUT_DIR}/${base_name}"
   tmp_path="$(mktemp "${output_path}.XXXXXX")"
   magick "${image_path}" \
-    -bordercolor none \
-    -border 1x1 \
+    -alpha set \
+    -channel A \
+    -threshold 1% \
+    +channel \
+    -background none \
+    -alpha background \
     -trim +repage \
     -resize "${INNER_SIZE}x${INNER_SIZE}" \
     -background none \
