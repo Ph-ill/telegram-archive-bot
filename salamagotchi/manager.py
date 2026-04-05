@@ -1032,6 +1032,8 @@ class SalamagotchiManager:
         candidates = []
         if action_name == "iran_flag":
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_iran_flag.webp"))
+        elif action_name == "usa_flag":
+            candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_usa_flag.webp"))
         else:
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_action_{action_name}.webp"))
 
