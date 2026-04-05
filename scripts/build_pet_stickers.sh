@@ -19,10 +19,8 @@ for image_path in "${SOURCE_DIR}"/*.png; do
   base_name="$(basename "${image_path}" .png)"
   output_path="${OUTPUT_DIR}/${base_name}.webp"
   magick "${image_path}" \
-    \( +clone -alpha extract -threshold 1% \) \
-    -alpha off \
-    -compose copyopacity \
-    -composite \
+    -bordercolor none \
+    -border 1x1 \
     -trim +repage \
     -resize "${INNER_SIZE}x${INNER_SIZE}" \
     -background none \

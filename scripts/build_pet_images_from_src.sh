@@ -25,10 +25,8 @@ for image_path in "${SOURCE_DIR}"/*.png; do
   output_path="${OUTPUT_DIR}/${base_name}"
   tmp_path="$(mktemp "${output_path}.XXXXXX")"
   magick "${image_path}" \
-    \( +clone -alpha extract -threshold 1% \) \
-    -alpha off \
-    -compose copyopacity \
-    -composite \
+    -bordercolor none \
+    -border 1x1 \
     -trim +repage \
     -resize "${INNER_SIZE}x${INNER_SIZE}" \
     -background none \
