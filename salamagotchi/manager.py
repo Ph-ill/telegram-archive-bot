@@ -12,6 +12,7 @@ import random
 import threading
 from copy import deepcopy
 from datetime import datetime, timedelta
+from itertools import combinations
 from typing import Any, Dict, List, Optional, Tuple
 
 import pytz
@@ -144,6 +145,22 @@ STAGE_EMOJIS = {
     "Teen": "🦖",
     "Adult": "🐉",
     "Elder": "🐲",
+}
+
+STAGE_IMAGE_SLUGS = {
+    "Eggling": "eggling",
+    "Baby": "baby",
+    "Child": "child",
+    "Teen": "teen",
+    "Adult": "adult",
+    "Elder": "elder",
+}
+
+NEED_IMAGE_TOKENS = {
+    "feed": "hungry",
+    "scoop": "poopy",
+    "wash": "dirty",
+    "play": "restless",
 }
 
 EVOLUTION_FLAVOR = {
@@ -346,6 +363,7 @@ class SalamagotchiManager:
     def __init__(self, data_dir: str, timezone_name: str = "America/Chicago"):
         self.data_dir = data_dir
         self.data_file_path = os.path.join(data_dir, "salamagotchi.json")
+        self.image_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "pet_images")
         self.lock = threading.Lock()
         self.timezone_name = timezone_name
         self.timezone = pytz.timezone(timezone_name)
@@ -895,7 +913,6 @@ class SalamagotchiManager:
     def _format_status_text(self, pet: Dict[str, Any]) -> str:
         stage = self._get_stage(pet.get("age_days", 0))
         safe_name = html.escape(pet.get("name", "Salamagotchi"))
-        status = "Alive" if pet.get("alive") else "Dead"
         stage_emoji = STAGE_EMOJIS.get(stage["name"], "🦎")
 
         age_text = f"{pet.get('age_days', 0)} day{'s' if pet.get('age_days', 0) != 1 else ''}"
@@ -926,6 +943,116 @@ class SalamagotchiManager:
         body_lines.extend(html.escape(line) for line in hint_lines)
 
         return f"{art_block}<blockquote expandable>{chr(10).join(body_lines)}</blockquote>"
+
+    def _build_status_caption(self, pet: Dict[str, Any], leading_message: Optional[str] = None) -> str:
+        stage = self._get_stage(pet.get("age_days", 0))
+        safe_name = html.escape(pet.get("name", "Salamagotchi"))
+        stage_emoji = STAGE_EMOJIS.get(stage["name"], "🦎")
+        age_text = f"{pet.get('age_days', 0)} day{'s' if pet.get('age_days', 0) != 1 else ''}"
+
+        lines: List[str] = []
+        if leading_message:
+            lines.extend([leading_message, ""])
+
+        lines.extend([
+            f"{stage_emoji} <b>{safe_name}</b>",
+            f"<b>Age:</b> {age_text}",
+            f"<b>Stage:</b> {html.escape(stage['name'])}",
+        ])
+
+        active_study_text = self._format_active_study(pet.get("active_study"))
+        if active_study_text:
+            lines.append(f"<b>Studying:</b> {html.escape(active_study_text)}")
+
+        if pet.get("education"):
+            lines.append(f"<b>Learned:</b> {html.escape(self._format_education_summary(pet['education']))}")
+
+        if pet.get("alive"):
+            lines.extend([
+                "",
+                f"<i>{html.escape(self._build_status_phrase(pet))}</i>",
+                "",
+            ])
+        else:
+            lines.append("")
+
+        hint_lines = self._build_hint_lines(pet) if pet.get("alive") else [
+            f"{safe_name} died of {html.escape(pet.get('death_reason', 'unknown causes'))}.",
+            "A new Salamagotchi can be spawned in this chat.",
+        ]
+        lines.extend(html.escape(line) for line in hint_lines)
+        return "\n".join(lines).strip()
+
+    def _get_need_image_tokens(self, pet: Dict[str, Any]) -> List[str]:
+        tokens: List[str] = []
+        for action, token in NEED_IMAGE_TOKENS.items():
+            remaining = max(0, REQUIREMENTS[action] - pet.get(f"{action}_count", 0))
+            if remaining > 0:
+                tokens.append(token)
+        return tokens
+
+    def _candidate_state_names(self, pet: Dict[str, Any]) -> List[str]:
+        if not pet.get("alive", True):
+            return ["dead"]
+
+        tokens = self._get_need_image_tokens(pet)
+        if not tokens:
+            return ["healthy"]
+
+        state_names = ["_".join(tokens)]
+        if len(tokens) >= 3:
+            state_names.append("critical")
+
+        for subset_size in range(len(tokens) - 1, 0, -1):
+            for subset in combinations(tokens, subset_size):
+                candidate = "_".join(subset)
+                if candidate not in state_names:
+                    state_names.append(candidate)
+
+        if "critical" not in state_names and len(tokens) >= 2:
+            state_names.append("critical")
+
+        state_names.append("healthy")
+        return state_names
+
+    def _get_state_image_path(self, pet: Dict[str, Any]) -> Optional[str]:
+        stage = self._get_stage(pet.get("age_days", 0))
+        stage_slug = STAGE_IMAGE_SLUGS.get(stage["name"])
+        if not stage_slug:
+            return None
+
+        for state_name in self._candidate_state_names(pet):
+            candidate_path = os.path.join(self.image_dir, f"{stage_slug}_{state_name}.png")
+            if os.path.exists(candidate_path):
+                return candidate_path
+        return None
+
+    def _get_action_image_path(self, action_name: Optional[str]) -> Optional[str]:
+        if not action_name:
+            return None
+        candidate_path = os.path.join(self.image_dir, f"action_{action_name}.png")
+        if os.path.exists(candidate_path):
+            return candidate_path
+        return None
+
+    def get_status_photo_payload(
+        self,
+        chat_id: int,
+        leading_message: Optional[str] = None,
+        preferred_action: Optional[str] = None,
+    ) -> Optional[Dict[str, str]]:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            return None
+
+        photo_path = self._get_action_image_path(preferred_action) or self._get_state_image_path(pet)
+        if not photo_path:
+            return None
+
+        return {
+            "photo_path": photo_path,
+            "caption": self._build_status_caption(pet, leading_message),
+        }
 
     def _apply_rollover(self, pet: Dict[str, Any], current_date: str) -> Tuple[Dict[str, Any], bool]:
         pet = deepcopy(pet)

@@ -1401,12 +1401,15 @@ class SeleniumArchiveBot:
             if result.get('success'):
                 self.salamagotchi_manager.add_command_log(chat_id, user_display, f"spawn {subcommand_args}")
             if result['success']:
-                return f"{result['message']}\n\n{result['status_text']}"
+                return self.build_salamagotchi_media_response(chat_id, result['message'], preferred_action="spawn")
             return result['message']
 
         if subcommand == "status":
             self.salamagotchi_manager.add_command_log(chat_id, user_display, "status")
-            return self.salamagotchi_manager.get_status_text(chat_id)
+            return self.build_salamagotchi_media_response(
+                chat_id,
+                fallback_text=self.salamagotchi_manager.get_status_text(chat_id),
+            )
 
         if subcommand == "teach_speak":
             self.salamagotchi_manager.add_command_log(chat_id, user_display, "teach_speak")
@@ -1459,7 +1462,12 @@ class SeleniumArchiveBot:
             if result.get('success'):
                 self.salamagotchi_manager.add_command_log(chat_id, user_display, f"school {school_command} {school_subject}".strip())
             if result.get('status_text'):
-                return f"{result['message']}\n\n{result['status_text']}"
+                return self.build_salamagotchi_media_response(
+                    chat_id,
+                    result['message'],
+                    preferred_action=f"school_{school_command}",
+                    fallback_text=f"{result['message']}\n\n{result['status_text']}",
+                )
             return result['message']
 
         if subcommand == "help":
@@ -1479,7 +1487,12 @@ class SeleniumArchiveBot:
                 if logged.get("success"):
                     result["message"] = f"{result['message']}\n{logged['message']}"
             if result.get('status_text'):
-                return f"{result['message']}\n\n{result['status_text']}"
+                return self.build_salamagotchi_media_response(
+                    chat_id,
+                    result['message'],
+                    preferred_action=subcommand,
+                    fallback_text=f"{result['message']}\n\n{result['status_text']}",
+                )
             return result['message']
 
         if subcommand in {"reset", "rename", "kill", "graveyard_remove_last", "memorial_preview", "stage_art", "evolution_preview"}:
@@ -1533,7 +1546,12 @@ class SeleniumArchiveBot:
                     return None
                 return result['memorial_text']
             if result.get('status_text'):
-                return f"{result['message']}\n\n{result['status_text']}"
+                return self.build_salamagotchi_media_response(
+                    chat_id,
+                    result['message'],
+                    preferred_action=subcommand,
+                    fallback_text=f"{result['message']}\n\n{result['status_text']}",
+                )
             if result.get('graveyard_text'):
                 return f"{result['message']}\n\n{result['graveyard_text']}"
             return result['message']
@@ -1542,10 +1560,29 @@ class SeleniumArchiveBot:
             custom_text = f"{subcommand} {subcommand_args}".strip()
             result = self.salamagotchi_manager.add_custom_command_log(chat_id, user_display, custom_text)
             if result.get('status_text'):
-                return f"{result['message']}\n\n{result['status_text']}"
+                return self.build_salamagotchi_media_response(
+                    chat_id,
+                    result['message'],
+                    fallback_text=f"{result['message']}\n\n{result['status_text']}",
+                )
             return result['message']
 
         return "Unknown Salamagotchi command."
+
+    def build_salamagotchi_media_response(self, chat_id, leading_message=None, preferred_action=None, fallback_text=None):
+        payload = self.salamagotchi_manager.get_status_photo_payload(
+            chat_id,
+            leading_message=leading_message,
+            preferred_action=preferred_action,
+        )
+        if payload:
+            return {
+                "type": "photo",
+                "photo_path": payload["photo_path"],
+                "caption": payload["caption"],
+                "parse_mode": "HTML",
+            }
+        return fallback_text
 
     def delete_preview_message_after_delay(self, chat_id, message_id):
         """Delete a preview message after a short delay."""
@@ -2763,7 +2800,50 @@ class SeleniumArchiveBot:
         except Exception as e:
             logger.error(f"Error sending message: {e}")
             return False
-    
+
+    def send_photo(self, chat_id, photo_path, caption=None, parse_mode=None):
+        """Send a local image file via Telegram Bot API."""
+        try:
+            import requests
+
+            url = f"{self.telegram_api_url}/sendPhoto"
+            data = {'chat_id': chat_id}
+            if caption:
+                data['caption'] = caption
+            if parse_mode:
+                data['parse_mode'] = parse_mode
+
+            with open(photo_path, 'rb') as photo_file:
+                files = {'photo': photo_file}
+                response = requests.post(url, data=data, files=files, timeout=30)
+
+            if response.status_code == 200:
+                result = response.json()
+                logger.info(f"Photo sent successfully to chat {chat_id}: {os.path.basename(photo_path)}")
+                return result.get('result', True)
+
+            logger.error(f"Failed to send photo: {response.text}")
+            return False
+        except Exception as e:
+            logger.error(f"Error sending photo %s: %s", photo_path, e)
+            return False
+
+    def send_bot_response(self, chat_id, response, disable_web_page_preview=False):
+        """Send either a text response or a structured media response."""
+        if isinstance(response, dict) and response.get("type") == "photo":
+            return self.send_photo(
+                chat_id,
+                response["photo_path"],
+                caption=response.get("caption"),
+                parse_mode=response.get("parse_mode"),
+            )
+
+        return self.send_message(
+            chat_id,
+            response,
+            disable_web_page_preview=disable_web_page_preview,
+        )
+
     def delete_message(self, chat_id, message_id):
         """Delete message via Telegram Bot API"""
         try:
@@ -2871,13 +2951,19 @@ class SeleniumArchiveBot:
             )
             if pending_speech_result:
                 self.processed_messages.add(msg_key)
-                reply_text = pending_speech_result.get("message", "")
                 status_text = pending_speech_result.get("status_text")
                 if status_text:
-                    reply_text = f"{reply_text}\n\n{status_text}"
+                    reply_text = self.build_salamagotchi_media_response(
+                        chat_id,
+                        pending_speech_result.get("message", ""),
+                        preferred_action="teach_speak",
+                        fallback_text=f"{pending_speech_result.get('message', '')}\n\n{status_text}",
+                    )
+                else:
+                    reply_text = pending_speech_result.get("message", "")
                 if reply_text:
-                    is_help_message = "Commands:" in reply_text
-                    success = self.send_message(chat_id, reply_text, disable_web_page_preview=is_help_message)
+                    is_help_message = isinstance(reply_text, str) and "Commands:" in reply_text
+                    success = self.send_bot_response(chat_id, reply_text, disable_web_page_preview=is_help_message)
                     if success:
                         logger.info(f"Successfully processed speech training reply for message {msg_key}")
                         if len(self.processed_messages) % 10 == 0:
@@ -2893,7 +2979,7 @@ class SeleniumArchiveBot:
                 # Send reply (disable web page preview for all help messages)
                 is_help_message = ("/help" in text.lower() or "/start" in text.lower() or 
                                  "/quiz_help" in text.lower() or "Commands:" in reply_text)
-                success = self.send_message(chat_id, reply_text, disable_web_page_preview=is_help_message)
+                success = self.send_bot_response(chat_id, reply_text, disable_web_page_preview=is_help_message)
                 if success:
                     logger.info(f"Successfully processed and replied to message {msg_key}")
                     # Save processed messages periodically
