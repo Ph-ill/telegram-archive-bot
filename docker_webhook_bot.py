@@ -1745,23 +1745,42 @@ class SeleniumArchiveBot:
                 self.salamagotchi_manager.add_command_log(chat_id, user_display, f"{subcommand} {subcommand_args}".strip())
             if result.get('memorial_text'):
                 if subcommand == "memorial_preview":
-                    sent_message = self.send_bot_response(
-                        chat_id,
-                        self.build_salamagotchi_memorial_response(chat_id, result['memorial_text']),
-                    )
-                    if sent_message and isinstance(sent_message, dict):
-                        preview_message_id = sent_message.get('message_id')
-                        if preview_message_id:
-                            logger.info(f"Scheduling memorial preview message {preview_message_id} for deletion in chat {chat_id} after 30 seconds")
-                            timer = threading.Timer(
-                                30,
-                                self.delete_preview_message_after_delay,
-                                args=(chat_id, preview_message_id),
-                            )
-                            timer.daemon = True
-                            timer.start()
+                    preview_response = self.build_salamagotchi_memorial_response(chat_id, result['memorial_text'])
+                    preview_message_ids = []
+                    if isinstance(preview_response, dict) and preview_response.get("type") == "sticker":
+                        sticker_result = self.send_sticker(chat_id, preview_response["sticker_path"])
+                        if sticker_result and isinstance(sticker_result, dict):
+                            sticker_message_id = sticker_result.get("message_id")
+                            if sticker_message_id:
+                                preview_message_ids.append(sticker_message_id)
+
+                        text_result = self.send_message(chat_id, preview_response.get("text", ""))
+                        if text_result and isinstance(text_result, dict):
+                            text_message_id = text_result.get("message_id")
+                            if text_message_id:
+                                preview_message_ids.append(text_message_id)
                     else:
-                        logger.warning(f"Memorial preview message could not be scheduled for deletion because send_message returned {type(sent_message).__name__}")
+                        text_result = self.send_message(chat_id, result['memorial_text'])
+                        if text_result and isinstance(text_result, dict):
+                            text_message_id = text_result.get("message_id")
+                            if text_message_id:
+                                preview_message_ids.append(text_message_id)
+
+                    if preview_message_ids:
+                        logger.info(
+                            "Scheduling %s memorial preview message(s) for deletion in chat %s after 30 seconds",
+                            len(preview_message_ids),
+                            chat_id,
+                        )
+                        timer = threading.Timer(
+                            30,
+                            self.delete_preview_messages_after_delay,
+                            args=(chat_id, preview_message_ids),
+                        )
+                        timer.daemon = True
+                        timer.start()
+                    else:
+                        logger.warning("Memorial preview messages could not be scheduled for deletion because no message ids were captured")
                     return None
                 return self.build_salamagotchi_memorial_response(chat_id, result['memorial_text'])
             if result.get('status_text'):
@@ -1809,6 +1828,17 @@ class SeleniumArchiveBot:
             self.delete_message(chat_id, message_id)
         except Exception as e:
             logger.error(f"Failed to delete preview message {message_id} in chat {chat_id}: {e}")
+
+    def delete_preview_messages_after_delay(self, chat_id, message_ids):
+        """Delete one or more preview messages after a short delay."""
+        for message_id in message_ids:
+            if not message_id:
+                continue
+            try:
+                logger.info(f"Attempting scheduled deletion for memorial preview message {message_id} in chat {chat_id}")
+                self.delete_message(chat_id, message_id)
+            except Exception as e:
+                logger.error(f"Failed to delete preview message {message_id} in chat {chat_id}: {e}")
     
     def handle_layla_command(self, chat_id):
         """Handle /layla command - send random image from layla_images folder"""
