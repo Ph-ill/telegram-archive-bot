@@ -1147,6 +1147,8 @@ class SalamagotchiManager:
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_russia_flag.webp"))
         elif action_name == "china_flag":
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_china_flag.webp"))
+        elif action_name == "bulgaria_flag":
+            candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_bulgaria_flag.webp"))
         else:
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_action_{action_name}.webp"))
 
@@ -2311,6 +2313,7 @@ class SalamagotchiManager:
             f"<code>{command_prefix} usa</code> - Show the pet enthusiastically supporting the USA\n"
             f"<code>{command_prefix} russia</code> - Show the pet enthusiastically supporting Russia\n"
             f"<code>{command_prefix} china</code> - Show the pet enthusiastically supporting China\n\n"
+            f"<code>{command_prefix} bulgaria</code> - Show the pet enthusiastically supporting Bulgaria\n\n"
             "<b>Admin Commands</b>\n"
             f"<code>{command_prefix} reset</code> - Reset today's care counters\n"
             f"<code>{command_prefix} rename &lt;name&gt;</code> - Rename the current pet\n"
