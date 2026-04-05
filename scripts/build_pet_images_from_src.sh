@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_DIR="${ROOT_DIR}/pet_images/src"
 OUTPUT_DIR="${ROOT_DIR}/pet_images"
 MAX_SIZE="${1:-512}"
+INNER_SIZE="${2:-492}"
 
 if ! command -v magick >/dev/null 2>&1; then
   echo "magick is required but not installed" >&2
@@ -25,7 +26,10 @@ for image_path in "${SOURCE_DIR}"/*.png; do
   tmp_path="$(mktemp "${output_path}.XXXXXX")"
   magick "${image_path}" \
     -trim +repage \
-    -resize "${MAX_SIZE}x${MAX_SIZE}" \
+    -resize "${INNER_SIZE}x${INNER_SIZE}" \
+    -background none \
+    -gravity center \
+    -extent "${MAX_SIZE}x${MAX_SIZE}" \
     -strip \
     -define png:compression-level=9 \
     -define png:compression-filter=5 \
