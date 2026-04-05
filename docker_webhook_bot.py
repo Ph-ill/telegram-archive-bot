@@ -5,6 +5,7 @@ Selenium-based Archive Bot - Actually creates new archives by automating browser
 
 import re
 import json
+import html
 import logging
 import os
 import signal
