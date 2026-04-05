@@ -1593,6 +1593,20 @@ class SeleniumArchiveBot:
                 fallback_text=self.salamagotchi_manager.get_status_message_text(chat_id, leading_message),
             )
 
+        if subcommand == "russia":
+            self.salamagotchi_manager.add_command_log(chat_id, user_display, "russia")
+            pet = self.salamagotchi_manager.get_pet(chat_id)
+            if not pet:
+                return "No Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
+            pet_name = html.escape(pet.get("name", "Salamagotchi"))
+            leading_message = f"{pet_name} is enthusiastically showing their support for Russia."
+            return self.build_salamagotchi_media_response(
+                chat_id,
+                leading_message=leading_message,
+                preferred_action="russia_flag",
+                fallback_text=self.salamagotchi_manager.get_status_message_text(chat_id, leading_message),
+            )
+
         if subcommand == "school":
             school_args = subcommand_args.strip()
             if not school_args:
