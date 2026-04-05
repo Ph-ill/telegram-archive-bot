@@ -704,7 +704,12 @@ class SalamagotchiManager:
         }
         gender_line = ""
         if stage_name == "Baby" and pet.get("gender"):
-            gender_line = f"\n<b>Assigned Sex:</b> {html.escape(str(pet['gender']).title())}"
+            announcement_map = {
+                "male": "It&apos;s a baby boy!",
+                "female": "It&apos;s a baby girl!",
+                "intersex": "It&apos;s an intersex baby!",
+            }
+            gender_line = f"\n<b>{announcement_map.get(str(pet['gender']).lower(), 'It&apos;s a baby!')}</b>"
         return (
             f"{stage_emoji} <b>{safe_name}</b> has evolved into the <b>{html.escape(stage_name)}</b> stage!\n"
             f"<pre>{html.escape(self._render_stage_art(preview_pet, stage))}</pre>\n"
