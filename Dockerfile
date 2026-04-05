@@ -30,6 +30,7 @@ COPY docker_webhook_bot.py .
 COPY quiz/ ./quiz/
 COPY salamagotchi/ ./salamagotchi/
 COPY pet_images/ ./pet_images/
+COPY pet_stickers/ ./pet_stickers/
 COPY birthday_images/ ./birthday_images/
 COPY layla_images/ ./layla_images/
 

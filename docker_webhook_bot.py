@@ -1408,7 +1408,7 @@ class SeleniumArchiveBot:
             self.salamagotchi_manager.add_command_log(chat_id, user_display, "status")
             return self.build_salamagotchi_media_response(
                 chat_id,
-                fallback_text=self.salamagotchi_manager.get_status_text(chat_id),
+                fallback_text=self.salamagotchi_manager.get_status_message_text(chat_id),
             )
 
         if subcommand == "teach_speak":
@@ -1466,7 +1466,7 @@ class SeleniumArchiveBot:
                     chat_id,
                     result['message'],
                     preferred_action=f"school_{school_command}",
-                    fallback_text=f"{result['message']}\n\n{result['status_text']}",
+                    fallback_text=self.salamagotchi_manager.get_status_message_text(chat_id, result['message']),
                 )
             return result['message']
 
@@ -1491,7 +1491,7 @@ class SeleniumArchiveBot:
                     chat_id,
                     result['message'],
                     preferred_action=subcommand,
-                    fallback_text=f"{result['message']}\n\n{result['status_text']}",
+                    fallback_text=self.salamagotchi_manager.get_status_message_text(chat_id, result['message']),
                 )
             return result['message']
 
@@ -1550,7 +1550,7 @@ class SeleniumArchiveBot:
                     chat_id,
                     result['message'],
                     preferred_action=subcommand,
-                    fallback_text=f"{result['message']}\n\n{result['status_text']}",
+                    fallback_text=self.salamagotchi_manager.get_status_message_text(chat_id, result['message']),
                 )
             if result.get('graveyard_text'):
                 return f"{result['message']}\n\n{result['graveyard_text']}"
@@ -1563,7 +1563,7 @@ class SeleniumArchiveBot:
                 return self.build_salamagotchi_media_response(
                     chat_id,
                     result['message'],
-                    fallback_text=f"{result['message']}\n\n{result['status_text']}",
+                    fallback_text=self.salamagotchi_manager.get_status_message_text(chat_id, result['message']),
                 )
             return result['message']
 
@@ -1577,9 +1577,9 @@ class SeleniumArchiveBot:
         )
         if payload:
             return {
-                "type": "photo",
-                "photo_path": payload["photo_path"],
-                "text": fallback_text or payload["caption"],
+                "type": "sticker",
+                "sticker_path": payload["sticker_path"],
+                "text": payload["text"],
             }
         return fallback_text
 
@@ -2800,38 +2800,36 @@ class SeleniumArchiveBot:
             logger.error(f"Error sending message: {e}")
             return False
 
-    def send_document(self, chat_id, document_path, caption=None, parse_mode=None):
-        """Send a local document/image via Telegram Bot API without Telegram photo recompression."""
+    def send_sticker(self, chat_id, sticker_path, emoji=None):
+        """Send a local static sticker via Telegram Bot API."""
         try:
             import requests
 
-            url = f"{self.telegram_api_url}/sendDocument"
+            url = f"{self.telegram_api_url}/sendSticker"
             data = {'chat_id': chat_id}
-            if caption:
-                data['caption'] = caption
-            if parse_mode:
-                data['parse_mode'] = parse_mode
+            if emoji:
+                data['emoji'] = emoji
 
-            with open(document_path, 'rb') as document_file:
-                files = {'document': (os.path.basename(document_path), document_file, 'image/png')}
+            with open(sticker_path, 'rb') as sticker_file:
+                files = {'sticker': (os.path.basename(sticker_path), sticker_file, 'image/webp')}
                 response = requests.post(url, data=data, files=files, timeout=30)
 
             if response.status_code == 200:
                 result = response.json()
-                logger.info(f"Document sent successfully to chat {chat_id}: {os.path.basename(document_path)}")
+                logger.info(f"Sticker sent successfully to chat {chat_id}: {os.path.basename(sticker_path)}")
                 return result.get('result', True)
 
-            logger.error(f"Failed to send document: {response.text}")
+            logger.error(f"Failed to send sticker: {response.text}")
             return False
         except Exception as e:
-            logger.error(f"Error sending document %s: %s", document_path, e)
+            logger.error(f"Error sending sticker %s: %s", sticker_path, e)
             return False
 
     def send_bot_response(self, chat_id, response, disable_web_page_preview=False):
         """Send either a text response or a structured media response."""
-        if isinstance(response, dict) and response.get("type") == "photo":
-            document_sent = self.send_document(chat_id, response["photo_path"])
-            if not document_sent:
+        if isinstance(response, dict) and response.get("type") == "sticker":
+            sticker_sent = self.send_sticker(chat_id, response["sticker_path"])
+            if not sticker_sent:
                 return False
 
             text = response.get("text")
@@ -2962,7 +2960,10 @@ class SeleniumArchiveBot:
                         chat_id,
                         pending_speech_result.get("message", ""),
                         preferred_action="teach_speak",
-                        fallback_text=f"{pending_speech_result.get('message', '')}\n\n{status_text}",
+                        fallback_text=self.salamagotchi_manager.get_status_message_text(
+                            chat_id,
+                            pending_speech_result.get("message", ""),
+                        ),
                     )
                 else:
                     reply_text = pending_speech_result.get("message", "")

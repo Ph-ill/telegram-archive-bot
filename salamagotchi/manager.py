@@ -364,6 +364,7 @@ class SalamagotchiManager:
         self.data_dir = data_dir
         self.data_file_path = os.path.join(data_dir, "salamagotchi.json")
         self.image_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "pet_images")
+        self.sticker_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "pet_stickers")
         self.lock = threading.Lock()
         self.timezone_name = timezone_name
         self.timezone = pytz.timezone(timezone_name)
@@ -910,17 +911,15 @@ class SalamagotchiManager:
 
         return lines
 
-    def _format_status_text(self, pet: Dict[str, Any]) -> str:
+    def _build_status_body_lines(self, pet: Dict[str, Any]) -> List[str]:
         stage = self._get_stage(pet.get("age_days", 0))
         safe_name = html.escape(pet.get("name", "Salamagotchi"))
         stage_emoji = STAGE_EMOJIS.get(stage["name"], "🦎")
 
-        age_text = f"{pet.get('age_days', 0)} day{'s' if pet.get('age_days', 0) != 1 else ''}"
-        art_block = f"<pre>{html.escape(self._render_stage_art(pet, stage))}</pre>"
         body_lines: List[str] = []
         body_lines.extend([
             f"{stage_emoji} <b>{safe_name}</b>",
-            f"<b>Age:</b> {age_text}",
+            f"<b>Age:</b> {pet.get('age_days', 0)} day{'s' if pet.get('age_days', 0) != 1 else ''}",
             f"<b>Stage:</b> {html.escape(stage['name'])}",
         ])
 
@@ -941,47 +940,20 @@ class SalamagotchiManager:
             "A new Salamagotchi can be spawned in this chat.",
         ]
         body_lines.extend(html.escape(line) for line in hint_lines)
+        return body_lines
+
+    def _format_status_text(self, pet: Dict[str, Any]) -> str:
+        stage = self._get_stage(pet.get("age_days", 0))
+        art_block = f"<pre>{html.escape(self._render_stage_art(pet, stage))}</pre>"
+        body_lines = self._build_status_body_lines(pet)
 
         return f"{art_block}<blockquote expandable>{chr(10).join(body_lines)}</blockquote>"
 
-    def _build_status_caption(self, pet: Dict[str, Any], leading_message: Optional[str] = None) -> str:
-        stage = self._get_stage(pet.get("age_days", 0))
-        safe_name = html.escape(pet.get("name", "Salamagotchi"))
-        stage_emoji = STAGE_EMOJIS.get(stage["name"], "🦎")
-        age_text = f"{pet.get('age_days', 0)} day{'s' if pet.get('age_days', 0) != 1 else ''}"
-
-        lines: List[str] = []
+    def _format_status_message_text(self, pet: Dict[str, Any], leading_message: Optional[str] = None) -> str:
+        body = f"<blockquote expandable>{chr(10).join(self._build_status_body_lines(pet))}</blockquote>"
         if leading_message:
-            lines.extend([leading_message, ""])
-
-        lines.extend([
-            f"{stage_emoji} <b>{safe_name}</b>",
-            f"<b>Age:</b> {age_text}",
-            f"<b>Stage:</b> {html.escape(stage['name'])}",
-        ])
-
-        active_study_text = self._format_active_study(pet.get("active_study"))
-        if active_study_text:
-            lines.append(f"<b>Studying:</b> {html.escape(active_study_text)}")
-
-        if pet.get("education"):
-            lines.append(f"<b>Learned:</b> {html.escape(self._format_education_summary(pet['education']))}")
-
-        if pet.get("alive"):
-            lines.extend([
-                "",
-                f"<i>{html.escape(self._build_status_phrase(pet))}</i>",
-                "",
-            ])
-        else:
-            lines.append("")
-
-        hint_lines = self._build_hint_lines(pet) if pet.get("alive") else [
-            f"{safe_name} died of {html.escape(pet.get('death_reason', 'unknown causes'))}.",
-            "A new Salamagotchi can be spawned in this chat.",
-        ]
-        lines.extend(html.escape(line) for line in hint_lines)
-        return "\n".join(lines).strip()
+            return f"{leading_message}\n\n{body}"
+        return body
 
     def _get_need_image_tokens(self, pet: Dict[str, Any]) -> List[str]:
         tokens: List[str] = []
@@ -1035,6 +1007,26 @@ class SalamagotchiManager:
             return candidate_path
         return None
 
+    def _get_state_sticker_path(self, pet: Dict[str, Any]) -> Optional[str]:
+        stage = self._get_stage(pet.get("age_days", 0))
+        stage_slug = STAGE_IMAGE_SLUGS.get(stage["name"])
+        if not stage_slug:
+            return None
+
+        for state_name in self._candidate_state_names(pet):
+            candidate_path = os.path.join(self.sticker_dir, f"{stage_slug}_{state_name}.webp")
+            if os.path.exists(candidate_path):
+                return candidate_path
+        return None
+
+    def _get_action_sticker_path(self, action_name: Optional[str]) -> Optional[str]:
+        if not action_name:
+            return None
+        candidate_path = os.path.join(self.sticker_dir, f"action_{action_name}.webp")
+        if os.path.exists(candidate_path):
+            return candidate_path
+        return None
+
     def get_status_photo_payload(
         self,
         chat_id: int,
@@ -1045,13 +1037,13 @@ class SalamagotchiManager:
         if not pet:
             return None
 
-        photo_path = self._get_action_image_path(preferred_action) or self._get_state_image_path(pet)
-        if not photo_path:
+        sticker_path = self._get_action_sticker_path(preferred_action) or self._get_state_sticker_path(pet)
+        if not sticker_path:
             return None
 
         return {
-            "photo_path": photo_path,
-            "caption": self._build_status_caption(pet, leading_message),
+            "sticker_path": sticker_path,
+            "text": self._format_status_message_text(pet, leading_message),
         }
 
     def _apply_rollover(self, pet: Dict[str, Any], current_date: str) -> Tuple[Dict[str, Any], bool]:
@@ -1188,6 +1180,14 @@ class SalamagotchiManager:
         if not pet:
             return "No Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
         return self._format_status_text(pet)
+
+    def get_status_message_text(self, chat_id: int, leading_message: Optional[str] = None) -> str:
+        pet = self.get_pet(chat_id)
+        if not pet:
+            if leading_message:
+                return f"{leading_message}\n\nNo Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
+            return "No Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
+        return self._format_status_message_text(pet, leading_message)
 
     def get_compact_status_text(self, chat_id: int) -> str:
         pet = self.get_pet(chat_id)
