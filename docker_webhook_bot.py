@@ -1579,8 +1579,7 @@ class SeleniumArchiveBot:
             return {
                 "type": "photo",
                 "photo_path": payload["photo_path"],
-                "caption": payload["caption"],
-                "parse_mode": "HTML",
+                "text": fallback_text or payload["caption"],
             }
         return fallback_text
 
@@ -2801,42 +2800,48 @@ class SeleniumArchiveBot:
             logger.error(f"Error sending message: {e}")
             return False
 
-    def send_photo(self, chat_id, photo_path, caption=None, parse_mode=None):
-        """Send a local image file via Telegram Bot API."""
+    def send_document(self, chat_id, document_path, caption=None, parse_mode=None):
+        """Send a local document/image via Telegram Bot API without Telegram photo recompression."""
         try:
             import requests
 
-            url = f"{self.telegram_api_url}/sendPhoto"
+            url = f"{self.telegram_api_url}/sendDocument"
             data = {'chat_id': chat_id}
             if caption:
                 data['caption'] = caption
             if parse_mode:
                 data['parse_mode'] = parse_mode
 
-            with open(photo_path, 'rb') as photo_file:
-                files = {'photo': photo_file}
+            with open(document_path, 'rb') as document_file:
+                files = {'document': (os.path.basename(document_path), document_file, 'image/png')}
                 response = requests.post(url, data=data, files=files, timeout=30)
 
             if response.status_code == 200:
                 result = response.json()
-                logger.info(f"Photo sent successfully to chat {chat_id}: {os.path.basename(photo_path)}")
+                logger.info(f"Document sent successfully to chat {chat_id}: {os.path.basename(document_path)}")
                 return result.get('result', True)
 
-            logger.error(f"Failed to send photo: {response.text}")
+            logger.error(f"Failed to send document: {response.text}")
             return False
         except Exception as e:
-            logger.error(f"Error sending photo %s: %s", photo_path, e)
+            logger.error(f"Error sending document %s: %s", document_path, e)
             return False
 
     def send_bot_response(self, chat_id, response, disable_web_page_preview=False):
         """Send either a text response or a structured media response."""
         if isinstance(response, dict) and response.get("type") == "photo":
-            return self.send_photo(
-                chat_id,
-                response["photo_path"],
-                caption=response.get("caption"),
-                parse_mode=response.get("parse_mode"),
-            )
+            document_sent = self.send_document(chat_id, response["photo_path"])
+            if not document_sent:
+                return False
+
+            text = response.get("text")
+            if text:
+                return self.send_message(
+                    chat_id,
+                    text,
+                    disable_web_page_preview=disable_web_page_preview,
+                )
+            return document_sent
 
         return self.send_message(
             chat_id,

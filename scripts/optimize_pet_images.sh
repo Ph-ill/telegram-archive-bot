@@ -14,6 +14,7 @@ shopt -s nullglob
 for image_path in "${IMAGE_DIR}"/*.png; do
   tmp_path="$(mktemp "${image_path}.XXXXXX")"
   magick "${image_path}" \
+    -trim +repage \
     -resize "${MAX_SIZE}x${MAX_SIZE}" \
     -strip \
     -define png:compression-level=9 \
