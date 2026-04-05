@@ -2,9 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_DIR="${ROOT_DIR}/pet_images"
+SOURCE_DIR="${ROOT_DIR}/pet_images/src"
 OUTPUT_DIR="${ROOT_DIR}/pet_stickers"
-MAX_SIZE="${1:-220}"
+MAX_SIZE="${1:-512}"
 
 if ! command -v magick >/dev/null 2>&1; then
   echo "magick is required but not installed" >&2

@@ -1002,6 +1002,7 @@ class SalamagotchiManager:
     def _get_action_image_path(self, action_name: Optional[str]) -> Optional[str]:
         if not action_name:
             return None
+        stage_slug = None
         candidate_path = os.path.join(self.image_dir, f"action_{action_name}.png")
         if os.path.exists(candidate_path):
             return candidate_path
@@ -1019,12 +1020,26 @@ class SalamagotchiManager:
                 return candidate_path
         return None
 
-    def _get_action_sticker_path(self, action_name: Optional[str]) -> Optional[str]:
+    def _get_action_sticker_path(self, pet: Dict[str, Any], action_name: Optional[str]) -> Optional[str]:
         if not action_name:
             return None
-        candidate_path = os.path.join(self.sticker_dir, f"action_{action_name}.webp")
-        if os.path.exists(candidate_path):
-            return candidate_path
+
+        stage = self._get_stage(pet.get("age_days", 0))
+        stage_slug = STAGE_IMAGE_SLUGS.get(stage["name"])
+        if not stage_slug:
+            return None
+
+        candidates = []
+        if action_name == "iran_flag":
+            candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_iran_flag.webp"))
+        else:
+            candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_action_{action_name}.webp"))
+
+        candidates.append(os.path.join(self.sticker_dir, f"action_{action_name}.webp"))
+
+        for candidate_path in candidates:
+            if os.path.exists(candidate_path):
+                return candidate_path
         return None
 
     def get_status_photo_payload(
@@ -1037,7 +1052,7 @@ class SalamagotchiManager:
         if not pet:
             return None
 
-        sticker_path = self._get_action_sticker_path(preferred_action) or self._get_state_sticker_path(pet)
+        sticker_path = self._get_action_sticker_path(pet, preferred_action) or self._get_state_sticker_path(pet)
         if not sticker_path:
             return None
 
