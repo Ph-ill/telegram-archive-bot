@@ -829,6 +829,21 @@ class SalamagotchiManager:
             f"<blockquote expandable>{safe_name} is in the middle of a transformation and cannot be interacted with for {html.escape(duration_text)}.</blockquote>"
         )
 
+    def _format_remaining_time_text(self, total_seconds: int) -> str:
+        total_seconds = max(0, int(total_seconds))
+        total_minutes = total_seconds // 60
+        days = total_minutes // (24 * 60)
+        hours = (total_minutes % (24 * 60)) // 60
+        minutes = total_minutes % 60
+
+        parts = []
+        if days:
+            parts.append(f"{days} day{'s' if days != 1 else ''}")
+        if hours or days:
+            parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+        return ", ".join(parts)
+
     def _build_evolution_complete_text(self, pet: Dict[str, Any], stage_name: str) -> str:
         safe_name = html.escape(pet.get("name", "Salamagotchi"))
         gender_line = self._build_baby_gender_line(pet, stage_name)
@@ -1348,11 +1363,15 @@ class SalamagotchiManager:
 
         complete_at = self._parse_iso_datetime(pet.get("evolution_complete_at"))
         is_ready = complete_at is not None and now >= complete_at
+        remaining_seconds = 0
+        if complete_at is not None:
+            remaining_seconds = max(0, int((complete_at - now).total_seconds()))
         return {
             "pet": pet,
             "ready": is_ready,
             "target_stage": pet.get("evolution_target_stage") or self._get_stage(pet.get("age_days", 0))["name"],
             "complete_at": complete_at,
+            "remaining_seconds": remaining_seconds,
         }
 
     def _apply_rollover(self, pet: Dict[str, Any], current_date: str) -> Tuple[Dict[str, Any], bool]:

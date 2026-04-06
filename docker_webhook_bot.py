@@ -1038,6 +1038,32 @@ class SeleniumArchiveBot:
         duration_text = self.salamagotchi_manager._format_duration_text(duration_seconds)
         return f"🌀 <b>{pet_name}</b> is evolving and cannot be interacted with for {duration_text}."
 
+    def get_salamagotchi_evolution_block_response(self, chat_id, remaining_seconds):
+        payload = self.salamagotchi_manager.get_evolution_start_payload(chat_id, duration_seconds=remaining_seconds)
+        if payload:
+            pet = self.salamagotchi_manager.get_pet(chat_id)
+            pet_name = html.escape(pet.get("name", "Salamagotchi")) if pet else "Salamagotchi"
+            remaining_text = self.salamagotchi_manager._format_remaining_time_text(remaining_seconds)
+            payload["text"] = (
+                f"🌀 <b>{pet_name}</b> is evolving!\n"
+                f"<blockquote expandable>{pet_name} is in the middle of a transformation and cannot be interacted with yet.\n"
+                f"<b>Time Remaining:</b> {html.escape(remaining_text)}</blockquote>"
+            )
+            return {
+                "type": "sticker",
+                "sticker_path": payload["sticker_path"],
+                "text": payload["text"],
+            }
+
+        pet = self.salamagotchi_manager.get_pet(chat_id)
+        pet_name = html.escape(pet.get("name", "Salamagotchi")) if pet else "Salamagotchi"
+        remaining_text = self.salamagotchi_manager._format_remaining_time_text(remaining_seconds)
+        return (
+            f"🌀 <b>{pet_name}</b> is evolving!\n"
+            f"<blockquote expandable>{pet_name} is in the middle of a transformation and cannot be interacted with yet.\n"
+            f"<b>Time Remaining:</b> {html.escape(remaining_text)}</blockquote>"
+        )
+
     def get_salamagotchi_evolution_complete_response(self, chat_id):
         payload = self.salamagotchi_manager.get_evolution_complete_payload(chat_id)
         if payload:
@@ -1721,7 +1747,10 @@ class SeleniumArchiveBot:
 
             allow_test_bypass = subcommand in {"evolution_test", "spawn_test"} and sender_username.lower() in special_users
             if not allow_test_bypass:
-                return self.get_salamagotchi_evolution_start_response(chat_id, duration_seconds=EVOLUTION_DURATION_SECONDS)
+                return self.get_salamagotchi_evolution_block_response(
+                    chat_id,
+                    remaining_seconds=evolution_status.get("remaining_seconds", EVOLUTION_DURATION_SECONDS),
+                )
 
         if subcommand == "status":
             self.salamagotchi_manager.add_command_log(chat_id, user_display, "status")
