@@ -1154,22 +1154,30 @@ class SalamagotchiManager:
         stage_slug = STAGE_IMAGE_SLUGS.get(stage["name"])
         if not stage_slug:
             return None
+        eggling_slug = STAGE_IMAGE_SLUGS.get("Eggling", "eggling")
 
         candidates = []
         if action_name == "iran_flag":
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_iran_flag.webp"))
+            candidates.append(os.path.join(self.sticker_dir, f"{eggling_slug}_iran_flag.webp"))
         elif action_name == "usa_flag":
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_usa_flag.webp"))
+            candidates.append(os.path.join(self.sticker_dir, f"{eggling_slug}_usa_flag.webp"))
         elif action_name == "russia_flag":
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_russia_flag.webp"))
+            candidates.append(os.path.join(self.sticker_dir, f"{eggling_slug}_russia_flag.webp"))
         elif action_name == "china_flag":
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_china_flag.webp"))
+            candidates.append(os.path.join(self.sticker_dir, f"{eggling_slug}_china_flag.webp"))
         elif action_name == "bulgaria_flag":
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_bulgaria_flag.webp"))
+            candidates.append(os.path.join(self.sticker_dir, f"{eggling_slug}_bulgaria_flag.webp"))
         elif action_name == "uk_flag":
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_uk_flag.webp"))
+            candidates.append(os.path.join(self.sticker_dir, f"{eggling_slug}_uk_flag.webp"))
         elif action_name == "england_flag":
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_england_flag.webp"))
+            candidates.append(os.path.join(self.sticker_dir, f"{eggling_slug}_england_flag.webp"))
         else:
             candidates.append(os.path.join(self.sticker_dir, f"{stage_slug}_action_{action_name}.webp"))
 
