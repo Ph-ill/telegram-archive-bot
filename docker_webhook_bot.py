@@ -1831,8 +1831,8 @@ class SeleniumArchiveBot:
                 fallback_text=self.salamagotchi_manager.get_status_message_text(chat_id, leading_message),
             )
 
-        if subcommand == "bulgaria":
-            self.salamagotchi_manager.add_command_log(chat_id, user_display, "bulgaria")
+        if subcommand in {"bulgaria", "down_syndrome_mode"}:
+            self.salamagotchi_manager.add_command_log(chat_id, user_display, subcommand)
             pet = self.salamagotchi_manager.get_pet(chat_id)
             if not pet:
                 return "No Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
