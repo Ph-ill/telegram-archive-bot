@@ -25,6 +25,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from salamagotchi import SalamagotchiManager
+from salamagotchi.manager import EVOLUTION_DURATION_SECONDS
 
 def setup_logging():
     """Setup logging with proper error handling"""
@@ -801,7 +802,7 @@ class SeleniumArchiveBot:
             help_text += f"• /pet{bot_mention} kill - Forcibly kill the current pet\n"
             help_text += f"• /pet{bot_mention} memorial_preview - Preview the memorial sticker and obituary for 30 seconds\n"
             help_text += f"• /pet{bot_mention} evolution_preview [stage] - Preview a stage evolution announcement\n"
-            help_text += f"• /pet{bot_mention} evolution_test - Preview the timed evolution lock and completion flow (30 seconds)\n"
+            help_text += f"• /pet{bot_mention} evolution_test - Preview the timed evolution lock and completion flow (30 seconds test, real lock is 6 hours)\n"
             help_text += f"• /pet{bot_mention} spawn_test [name] - Preview the delayed spawn flow (30 seconds, cosmetic only)\n"
             help_text += f"• /pet{bot_mention} stage_art - Preview the ASCII art for every life stage\n"
             help_text += f"• /pet{bot_mention} graveyard_remove_last - Remove the newest graveyard entry\n"
@@ -1024,7 +1025,7 @@ class SeleniumArchiveBot:
         except Exception as e:
             logger.error(f"Failed to send Salamagotchi spawn test completion for chat {chat_id}: {e}")
 
-    def get_salamagotchi_evolution_start_response(self, chat_id, duration_seconds=3600):
+    def get_salamagotchi_evolution_start_response(self, chat_id, duration_seconds=EVOLUTION_DURATION_SECONDS):
         payload = self.salamagotchi_manager.get_evolution_start_payload(chat_id, duration_seconds=duration_seconds)
         if payload:
             return {
@@ -1169,12 +1170,12 @@ class SeleniumArchiveBot:
                         chat_id,
                         self.get_salamagotchi_evolution_start_response(
                             chat_id,
-                            duration_seconds=event.get("evolution_duration_seconds", 3600),
+                            duration_seconds=event.get("evolution_duration_seconds", EVOLUTION_DURATION_SECONDS),
                         ),
                     )
                     self.schedule_salamagotchi_evolution_completion(
                         chat_id,
-                        event.get("evolution_duration_seconds", 3600),
+                        event.get("evolution_duration_seconds", EVOLUTION_DURATION_SECONDS),
                     )
         except Exception as e:
             logger.error(f"Error processing Salamagotchi rollovers: {e}")
@@ -1720,7 +1721,7 @@ class SeleniumArchiveBot:
 
             allow_test_bypass = subcommand in {"evolution_test", "spawn_test"} and sender_username.lower() in special_users
             if not allow_test_bypass:
-                return self.get_salamagotchi_evolution_start_response(chat_id, duration_seconds=3600)
+                return self.get_salamagotchi_evolution_start_response(chat_id, duration_seconds=EVOLUTION_DURATION_SECONDS)
 
         if subcommand == "status":
             self.salamagotchi_manager.add_command_log(chat_id, user_display, "status")

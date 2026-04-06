@@ -19,6 +19,8 @@ import pytz
 
 logger = logging.getLogger(__name__)
 
+EVOLUTION_DURATION_SECONDS = 6 * 3600
+
 
 REQUIREMENTS = {
     "feed": 1,
@@ -819,7 +821,7 @@ class SalamagotchiManager:
         pet["spawn_complete_at"] = None
         return pet
 
-    def _build_evolution_start_text(self, pet: Dict[str, Any], duration_seconds: int = 3600) -> str:
+    def _build_evolution_start_text(self, pet: Dict[str, Any], duration_seconds: int = EVOLUTION_DURATION_SECONDS) -> str:
         safe_name = html.escape(pet.get("name", "Salamagotchi"))
         duration_text = self._format_duration_text(duration_seconds)
         return (
@@ -839,7 +841,7 @@ class SalamagotchiManager:
         pet: Dict[str, Any],
         target_stage: str,
         now: Optional[datetime] = None,
-        duration_seconds: int = 3600,
+        duration_seconds: int = EVOLUTION_DURATION_SECONDS,
     ) -> Dict[str, Any]:
         pet = self._normalize_pet(pet)
         now = now or datetime.now(pytz.UTC)
@@ -1281,7 +1283,7 @@ class SalamagotchiManager:
     def get_evolution_start_payload(
         self,
         chat_id: int,
-        duration_seconds: int = 3600,
+        duration_seconds: int = EVOLUTION_DURATION_SECONDS,
     ) -> Optional[Dict[str, str]]:
         pet = self.get_pet(chat_id)
         if not pet:
@@ -1435,10 +1437,10 @@ class SalamagotchiManager:
                 if not updated_pet.get("alive", False):
                     event["memorial_text"] = self.build_death_memorial_text(updated_pet)
                 elif stage_changed:
-                    updated_pet = self._start_pending_evolution(updated_pet, event["stage"], now=now, duration_seconds=3600)
+                    updated_pet = self._start_pending_evolution(updated_pet, event["stage"], now=now, duration_seconds=EVOLUTION_DURATION_SECONDS)
                     data[chat_id] = updated_pet
                     event["evolution_pending"] = True
-                    event["evolution_duration_seconds"] = 3600
+                    event["evolution_duration_seconds"] = EVOLUTION_DURATION_SECONDS
                 events.append(event)
 
             if changed:
@@ -2327,7 +2329,7 @@ class SalamagotchiManager:
             f"<code>{command_prefix} kill</code> - Forcibly kill the current pet\n\n"
             f"<code>{command_prefix} memorial_preview</code> - Preview the memorial sticker and obituary for 30 seconds\n\n"
             f"<code>{command_prefix} evolution_preview [stage]</code> - Preview a stage evolution announcement\n\n"
-            f"<code>{command_prefix} evolution_test</code> - Preview the timed evolution lock and completion flow with a 30-second delay\n\n"
+            f"<code>{command_prefix} evolution_test</code> - Preview the timed evolution lock and completion flow with a 30-second delay; real evolutions lock for 6 hours\n\n"
             f"<code>{command_prefix} spawn_test [name]</code> - Preview the delayed spawn flow with a 30-second delay, without storing data\n\n"
             f"<code>{command_prefix} stage_art</code> - Preview the ASCII art for every life stage\n\n"
             f"<code>{command_prefix} graveyard_remove_last</code> - Remove the newest graveyard entry\n\n"
