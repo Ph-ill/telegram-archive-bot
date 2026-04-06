@@ -1304,7 +1304,10 @@ class SalamagotchiManager:
             return None
 
         stage_name = pet.get("evolution_target_stage") or self._get_stage(pet.get("age_days", 0))["name"]
-        sticker_path = self._get_stage_state_sticker_path(stage_name, "healthy")
+        if stage_name == "Baby":
+            sticker_path = self._get_named_action_sticker_path("baby_hatch")
+        else:
+            sticker_path = self._get_stage_state_sticker_path(stage_name, "healthy")
         if not sticker_path:
             return None
 
@@ -1322,7 +1325,10 @@ class SalamagotchiManager:
         if stage_name == "Baby" and not preview_pet.get("gender"):
             preview_pet["gender"] = self._assign_gender()
 
-        sticker_path = self._get_stage_state_sticker_path(stage_name, "healthy")
+        if stage_name == "Baby":
+            sticker_path = self._get_named_action_sticker_path("baby_hatch")
+        else:
+            sticker_path = self._get_stage_state_sticker_path(stage_name, "healthy")
         if not sticker_path:
             return None
 
