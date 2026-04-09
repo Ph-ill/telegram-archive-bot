@@ -1880,7 +1880,7 @@ class SeleniumArchiveBot:
             if not pet:
                 return "No Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
             pet_name = html.escape(pet.get("name", "Salamagotchi"))
-            leading_message = f"{pet_name} has put their playlist on repeat and every track is a banger."
+            leading_message = f"{pet_name} has put their playlist on shuffle and every track is a banger."
             return self.build_salamagotchi_media_response(
                 chat_id,
                 leading_message=leading_message,
