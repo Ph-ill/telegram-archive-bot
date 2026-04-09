@@ -777,6 +777,7 @@ class SeleniumArchiveBot:
         help_text += f"• /pet{bot_mention} uk - Show the pet enthusiastically supporting the United Kingdom\n"
         help_text += f"• /pet{bot_mention} united kingdom - Same as uk\n"
         help_text += f"• /pet{bot_mention} england - Show the pet enthusiastically supporting England\n"
+        help_text += f"• /pet{bot_mention} greg - Let the pet vibe to a shuffled playlist\n"
         help_text += f"• /pet{bot_mention} help - Salamagotchi rules and commands\n"
         help_text += f"• /layla{bot_mention} - Send a random Layla image\n"
         help_text += f"• /bored{bot_mention} - Get a random activity suggestion\n"
@@ -1870,6 +1871,20 @@ class SeleniumArchiveBot:
                 chat_id,
                 leading_message=leading_message,
                 preferred_action="england_flag",
+                fallback_text=self.salamagotchi_manager.get_status_message_text(chat_id, leading_message),
+            )
+
+        if subcommand.lower() == "greg":
+            self.salamagotchi_manager.add_command_log(chat_id, user_display, subcommand)
+            pet = self.salamagotchi_manager.get_pet(chat_id)
+            if not pet:
+                return "No Salamagotchi exists in this chat yet. Use <code>/pet spawn &lt;name&gt;</code> to create one."
+            pet_name = html.escape(pet.get("name", "Salamagotchi"))
+            leading_message = f"{pet_name} has put their playlist on repeat and every track is a banger."
+            return self.build_salamagotchi_media_response(
+                chat_id,
+                leading_message=leading_message,
+                preferred_action="greg",
                 fallback_text=self.salamagotchi_manager.get_status_message_text(chat_id, leading_message),
             )
 
